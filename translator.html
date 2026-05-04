@@ -645,7 +645,22 @@ async function translateFile() {
       progressText.textContent = `${i+1} / ${total} 청크 번역 중...`;
       progressFill.style.width = ((i / total) * 100) + '%';
 
-      const translated = await callClaude(chunks[i]);
+      // 최대 5번 자동 재시도
+      let translated = '';
+      for (let retry = 0; retry < 5; retry++) {
+        try {
+          if (retry > 0) {
+            const wait = retry * 3000;
+            setStatus(`청크 ${i+1} 재시도 중 (${retry}/5)... ${wait/1000}초 대기`, 'working');
+            progressText.textContent = `청크 ${i+1} 재시도 ${retry}/5 대기 중...`;
+            await new Promise(r => setTimeout(r, wait));
+          }
+          translated = await callClaude(chunks[i]);
+          break;
+        } catch (e) {
+          if (retry === 4) throw new Error(`청크 ${i+1} 번역 실패 (5회 재시도 초과): ${e.message}`);
+        }
+      }
       results.push(translated);
 
       // Show chunk preview
