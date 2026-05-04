@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>중문 소설 번역기 — DeepSeek</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=Noto+Serif+SC:wght@300;400&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0c0a;
+    --surface: #161310;
+    --border: #2a2420;
+    --border-bright: #3d342c;
+    --accent: #c9923a;
+    --accent-dim: #7a5520;
+    --text: #e8ddd0;
+    --text-dim: #8a7a6a;
+    --text-muted: #4a3f35;
+    --red: #c94a3a;
+    --green: #5a9a6a;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif KR', serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .logo-cn {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: 4px;
+  }
+  .logo-kr {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+  .api-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .api-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .api-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 7px 12px;
+    width: 220px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-input:focus { border-color: var(--accent-dim); }
+
+  /* MAIN LAYOUT */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 40px;
+    gap: 24px;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 13px;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+    margin-bottom: -1px;
+  }
+  .tab-btn:hover { color: var(--text-dim); }
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* PANELS */
+  .panel { display: none; }
+  .panel.active { display: flex; flex-direction: column; gap: 16px; }
+
+  /* TEXT MODE */
+  .editors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .editor-wrap { display: flex; flex-direction: column; gap: 8px; }
+  .editor-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .editor-label span {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    color: var(--accent-dim);
+    letter-spacing: 2px;
+  }
+  textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 14px;
+    line-height: 1.9;
+    padding: 20px;
+    resize: vertical;
+    min-height: 380px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--border-bright); }
+  textarea::placeholder { color: var(--text-muted); }
+  #output-text {
+    color: var(--text);
+    background: var(--surface);
+    cursor: default;
+  }
+
+  /* FILE MODE */
+  #fileInput { display: none; }
+  .upload-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 36px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .upload-icon { font-size: 44px; }
+  .upload-desc {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .upload-file-label {
+    display: inline-block;
+    background: var(--accent);
+    color: #0e0c0a;
+    font-family: 'Noto Serif KR', serif;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 14px 44px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .upload-file-label:active { background: #d9a34a; }
+  .upload-formats {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .file-info.visible { display: flex; }
+  .file-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+    flex: 1;
+  }
+  .file-size {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    border: none;
+    padding: 11px 28px;
+    font-family: 'Noto Serif KR', serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0e0c0a;
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: #d9a34a; }
+  .btn-primary:disabled {
+    background: var(--accent-dim);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border-bright);
+    color: var(--text-dim);
+  }
+  .btn-ghost:hover { border-color: var(--accent-dim); color: var(--accent); }
+  .btn-ghost:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .filename-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    outline: none;
+    width: 200px;
+    transition: border-color 0.2s;
+  }
+  .filename-input:focus { border-color: var(--accent-dim); }
+
+  /* STATUS */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    min-height: 20px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .status-dot.working { background: var(--accent); animation: pulse 1s infinite; }
+  .status-dot.done { background: var(--green); }
+  .status-dot.error { background: var(--red); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* PROGRESS */
+  .progress-wrap {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .progress-wrap.visible { display: flex; }
+  .progress-bar-bg {
+    height: 2px;
+    background: var(--border);
+    width: 100%;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+    width: 0%;
+  }
+  .progress-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* CHUNK DISPLAY */
+  .chunks-wrap {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .chunks-wrap.visible { display: flex; }
+  .chunk-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text-dim);
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .chunk-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 40px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 20px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-cn">譯</div>
+    <div class="logo-kr">중문 소설 번역기 · DeepSeek</div>
+  </div>
+  <div class="api-area">
+    <div class="api-label">API Key</div>
+    <input class="api-input" id="apiKey" type="password" placeholder="sk-... (DeepSeek API Key)">
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('text')">텍스트 입력</button>
+    <button class="tab-btn" onclick="switchTab('file')">파일 업로드</button>
+  </div>
+
+  <!-- TEXT PANEL -->
+  <div class="panel active" id="panel-text">
+    <div class="editors">
+      <div class="editor-wrap">
+        <div class="editor-label"><span>原文</span> 원문 (중국어)</div>
+        <textarea id="input-text" placeholder="번역할 중국어 원문을 붙여넣으세요..."></textarea>
+      </div>
+      <div class="editor-wrap">
+        <div class="editor-label"><span>譯文</span> 번역 결과 (한국어)</div>
+        <textarea id="output-text" readonly placeholder="번역 결과가 여기에 표시됩니다..."></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="btn-translate-text" onclick="translateText()">번역 시작</button>
+      <button class="btn btn-ghost" id="btn-download-text" onclick="downloadText()" disabled>TXT 다운로드</button>
+      <input class="filename-input" id="filename-text" type="text" placeholder="파일명 (선택)">
+      <button class="btn btn-ghost" onclick="clearAll()">초기화</button>
+    </div>
+  </div>
+
+  <!-- FILE PANEL -->
+  <div class="panel" id="panel-file">
+    <input type="file" id="fileInput" accept=".txt,.docx,text/plain" onchange="handleFile(this.files[0])">
+    <div class="upload-area">
+      <div class="upload-icon">📂</div>
+      <div class="upload-desc">번역할 파일을 선택해주세요</div>
+      <label class="upload-file-label" for="fileInput">파일 선택하기</label>
+      <div class="upload-formats">.txt · .docx 지원</div>
+    </div>
+    <div class="file-info" id="fileInfo">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+      <button class="btn btn-ghost" onclick="removeFile()" style="padding:6px 14px;font-size:12px;">제거</button>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="btn-translate-file" onclick="translateFile()" disabled>번역 시작</button>
+      <input class="filename-input" id="filename-file" type="text" placeholder="출력 파일명 (선택)">
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      <div class="progress-text" id="progressText">준비 중...</div>
+    </div>
+    <div class="chunks-wrap" id="chunksWrap"></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <div id="statusMsg">DeepSeek API 키를 입력하고 번역을 시작하세요</div>
+  </div>
+</main>
+
+<footer>
+  <span>모델: deepseek-chat</span>
+  <span>·</span>
+  <span>중국어 → 한국어 전문 번역</span>
+  <span>·</span>
+  <span>성인소설 완전 번역 지원</span>
+</footer>
+
+<script>
+// ── SYSTEM PROMPT ──────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아래 원칙을 반드시 지켜 번역하세요.
+
+## 핵심 원칙
+
+### 1. 완전한 충실도 (내용 누락·추가 금지)
+- 원문의 모든 문장, 묘사, 대화를 빠짐없이 번역한다.
+- 원문에 없는 내용을 절대 추가하지 않는다.
+- 요약하거나 생략하지 않는다. 문장 하나하나를 그대로 옮긴다.
+
+### 2. 자연스러운 한국어 (한국 소설 문체)
+- 직역체를 피하고, 한국 독자가 읽기 편한 자연스러운 문장으로 다듬는다.
+- 중국어 특유의 어순이나 표현은 한국어 어감에 맞게 재구성한다.
+- 인물의 감정, 분위기, 뉘앙스를 한국 소설 문체로 살린다.
+- 대화문은 한국인이 실제로 말하는 방식으로 번역한다.
+
+### 3. 성인 묘사 완전 번역
+- 성인 묘사 장면은 원문의 길이와 수위를 그대로 유지한다.
+- 축약·완화·생략 없이 원문의 표현 강도를 한국어로 정확히 재현한다.
+- 신체 묘사, 감각 묘사, 심리 묘사 모두 원문 분량을 유지한다.
+
+## 출력 규칙
+- 번역문만 출력한다.
+- 주석, 설명, 메모는 일절 붙이지 않는다.
+- 원문 언어로 된 텍스트를 출력에 포함하지 않는다.`;
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let currentTab = 'text';
+let uploadedFile = null;
+let uploadedText = '';
+let translatedResult = '';
+
+// ── TABS ────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', ['text','file'][i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+// ── STATUS ───────────────────────────────────────────────────────────────────
+function setStatus(msg, state='idle') {
+  document.getElementById('statusMsg').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state !== 'idle' ? ' ' + state : '');
+}
+
+// ── API CALL (DeepSeek) ───────────────────────────────────────────────────────
+async function callClaude(text) {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) throw new Error('DeepSeek API 키를 입력해주세요.');
+
+  const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      max_tokens: 8000,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `다음 중국어 원문을 번역해주세요:\n\n${text}` }
+      ]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API 오류 (${resp.status})`);
+  }
+
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ── TEXT MODE ─────────────────────────────────────────────────────────────────
+async function translateText() {
+  const input = document.getElementById('input-text').value.trim();
+  if (!input) { setStatus('원문을 입력해주세요.', 'error'); return; }
+
+  const btn = document.getElementById('btn-translate-text');
+  btn.disabled = true;
+  btn.textContent = '번역 중...';
+  setStatus('번역 중입니다...', 'working');
+  document.getElementById('output-text').value = '';
+
+  try {
+    const result = await callClaude(input);
+    document.getElementById('output-text').value = result;
+    translatedResult = result;
+    document.getElementById('btn-download-text').disabled = false;
+    setStatus(`번역 완료 — ${result.length.toLocaleString()}자`, 'done');
+  } catch (e) {
+    setStatus('오류: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '번역 시작';
+  }
+}
+
+function downloadText() {
+  if (!translatedResult) return;
+  const name = document.getElementById('filename-text').value.trim() || '번역결과';
+  const blob = new Blob([translatedResult], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.txt';
+  a.click();
+  setStatus('다운로드 완료', 'done');
+}
+
+function clearAll() {
+  document.getElementById('input-text').value = '';
+  document.getElementById('output-text').value = '';
+  document.getElementById('btn-download-text').disabled = true;
+  translatedResult = '';
+  setStatus('초기화되었습니다.');
+}
+
+// ── FILE MODE ─────────────────────────────────────────────────────────────────
+
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['txt', 'docx'].includes(ext)) {
+    setStatus('지원하지 않는 형식입니다. (.txt, .docx)', 'error'); return;
+  }
+  uploadedFile = file;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatSize(file.size);
+  document.getElementById('fileInfo').classList.add('visible');
+  document.getElementById('btn-translate-file').disabled = false;
+  setStatus('파일이 로드되었습니다: ' + file.name);
+}
+
+function removeFile() {
+  uploadedFile = null; uploadedText = '';
+  document.getElementById('fileInfo').classList.remove('visible');
+  document.getElementById('btn-translate-file').disabled = true;
+  document.getElementById('fileInput').value = '';
+  setStatus('파일이 제거되었습니다.');
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
+// Chunk text into ~1500 char segments by paragraph
+function chunkText(text, maxLen = 1500) {
+  const paras = text.split(/\n+/);
+  const chunks = [];
+  let cur = '';
+  for (const p of paras) {
+    if ((cur + '\n' + p).length > maxLen && cur) {
+      chunks.push(cur.trim());
+      cur = p;
+    } else {
+      cur = cur ? cur + '\n' + p : p;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  return chunks;
+}
+
+async function translateFile() {
+  if (!uploadedFile) return;
+
+  const btn = document.getElementById('btn-translate-file');
+  btn.disabled = true;
+  btn.textContent = '번역 중...';
+
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const progressText = document.getElementById('progressText');
+  const chunksWrap = document.getElementById('chunksWrap');
+
+  progressWrap.classList.add('visible');
+  chunksWrap.classList.add('visible');
+  chunksWrap.innerHTML = '';
+  progressFill.style.width = '0%';
+
+  try {
+    // Read file
+    setStatus('파일 읽는 중...', 'working');
+    const text = await readFile(uploadedFile);
+    const chunks = chunkText(text);
+    const total = chunks.length;
+    progressText.textContent = `0 / ${total} 청크 번역 중...`;
+
+    const results = [];
+
+    for (let i = 0; i < total; i++) {
+      setStatus(`청크 번역 중 (${i+1}/${total})...`, 'working');
+      progressText.textContent = `${i+1} / ${total} 청크 번역 중...`;
+      progressFill.style.width = ((i / total) * 100) + '%';
+
+      const translated = await callClaude(chunks[i]);
+      results.push(translated);
+
+      // Show chunk preview
+      const item = document.createElement('div');
+      item.className = 'chunk-item';
+      item.innerHTML = `<div class="chunk-label">청크 ${i+1} / ${total}</div>${translated.substring(0, 200)}${translated.length > 200 ? '...' : ''}`;
+      chunksWrap.appendChild(item);
+      chunksWrap.scrollTop = chunksWrap.scrollHeight;
+    }
+
+    progressFill.style.width = '100%';
+    progressText.textContent = `번역 완료 — 총 ${total} 청크`;
+
+    const finalText = results.join('\n\n');
+    const name = document.getElementById('filename-file').value.trim() ||
+                 uploadedFile.name.replace(/\.[^.]+$/, '') + '_번역';
+
+    // Download
+    const blob = new Blob([finalText], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.txt';
+    a.click();
+
+    setStatus(`번역 완료 — ${finalText.length.toLocaleString()}자 다운로드됨`, 'done');
+  } catch(e) {
+    setStatus('오류: ' + e.message, 'error');
+    progressText.textContent = '오류 발생';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '번역 시작';
+  }
+}
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'txt') {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsText(file, 'utf-8');
+    } else if (ext === 'docx') {
+      // Use mammoth via CDN
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+      script.onload = () => {
+        const reader = new FileReader();
+        reader.onload = async e => {
+          try {
+            const result = await mammoth.extractRawText({ arrayBuffer: e.target.result });
+            resolve(result.value);
+          } catch(err) { reject(err); }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+      };
+      script.onerror = () => reject(new Error('mammoth 라이브러리 로드 실패'));
+      document.head.appendChild(script);
+    }
+  });
+}
+</script>
+</body>
+</html>
