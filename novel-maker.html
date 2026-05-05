@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소설 제조기</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;700&family=DM+Mono:wght@300;400&family=Noto+Serif+SC:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0808;
+  --surface: #130f0f;
+  --surface2: #1a1414;
+  --border: #2a1f1f;
+  --border-bright: #3d2a2a;
+  --accent: #c43a3a;
+  --accent-dim: #7a2020;
+  --accent-glow: rgba(196,58,58,0.15);
+  --text: #ede0d8;
+  --text-dim: #9a8078;
+  --text-muted: #4a3530;
+  --gold: #c9923a;
+  --green: #5a9a6a;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  color: #0a0808;
+  font-weight: 700;
+}
+.logo-text { font-size: 16px; letter-spacing: 3px; color: var(--text); }
+.logo-sub { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; letter-spacing: 1px; margin-top: 2px; }
+
+.api-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.api-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.api-input {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 11px;
+  padding: 6px 10px; width: 180px; outline: none;
+}
+.api-input:focus { border-color: var(--accent-dim); }
+
+/* ── LAYOUT ── */
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0;
+  height: calc(100vh - 65px);
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding: 20px;
+}
+.section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+label {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+  margin-top: 12px;
+}
+label:first-of-type { margin-top: 0; }
+
+input[type="text"], input[type="number"], textarea, select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus { border-color: var(--accent-dim); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+select { cursor: pointer; }
+select option { background: var(--surface); }
+
+textarea { min-height: 80px; line-height: 1.7; }
+
+/* 인물 카드 */
+.characters-list { display: flex; flex-direction: column; gap: 8px; }
+.char-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.char-name { font-size: 13px; color: var(--text); }
+.char-role { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent-dim); }
+.char-del {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 16px; padding: 0 4px;
+  transition: color 0.2s;
+}
+.char-del:hover { color: var(--accent); }
+
+.char-add-row { display: flex; gap: 6px; margin-top: 8px; }
+.char-add-row input { flex: 1; }
+.btn-sm {
+  background: var(--accent-dim); border: none; color: var(--text);
+  font-family: 'Noto Serif KR', serif; font-size: 12px;
+  padding: 8px 12px; cursor: pointer; white-space: nowrap;
+  transition: background 0.2s;
+}
+.btn-sm:hover { background: var(--accent); }
+
+/* 참고 소설 */
+.ref-upload-label {
+  display: block;
+  border: 1px dashed var(--border-bright);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+.ref-upload-label:hover { border-color: var(--accent-dim); color: var(--accent); }
+#refFileInput { display: none; }
+.ref-loaded {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--green);
+  margin-top: 8px;
+  display: none;
+}
+
+/* ── CONTENT AREA ── */
+.content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 탭 */
+.tabs {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  background: var(--surface);
+  padding: 0 20px;
+}
+.tab-btn {
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 12px;
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text-dim); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.panel.active { display: flex; }
+
+/* 생성 패널 */
+.generate-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.episode-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.episode-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.plot-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plot-input textarea {
+  min-height: 100px;
+  background: var(--bg);
+}
+
+/* 생성 버튼 */
+.btn-generate {
+  background: var(--accent);
+  border: none;
+  color: #0a0808;
+  font-family: 'Noto Serif KR', serif;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 32px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+.btn-generate:hover { background: #d94a4a; }
+.btn-generate:disabled { background: var(--accent-dim); cursor: not-allowed; color: var(--text-muted); }
+
+/* 결과 패널 */
+.result-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.result-toolbar {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+}
+.result-toolbar .episode-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 4px 10px;
+  border: 1px solid var(--accent-dim);
+}
+.btn-ghost {
+  background: none; border: 1px solid var(--border-bright);
+  color: var(--text-dim); font-family: 'Noto Serif KR', serif;
+  font-size: 12px; padding: 6px 14px; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-ghost:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+.result-text {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  font-size: 15px;
+  line-height: 2.1;
+  color: var(--text);
+  white-space: pre-wrap;
+  font-family: 'Noto Serif KR', serif;
+}
+.result-text.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1px;
+}
+
+/* 히스토리 패널 */
+.history-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.history-item:hover { border-color: var(--accent-dim); }
+.history-ep {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.history-preview {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.history-empty {
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+/* 상태바 */
+.statusbar {
+  border-top: 1px solid var(--border);
+  padding: 8px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.status-dot.working { background: var(--accent); animation: pulse 1s infinite; }
+.status-dot.done { background: var(--green); }
+.status-dot.error { background: var(--accent); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); }
+
+/* 모바일 */
+@media (max-width: 700px) {
+  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow: visible; }
+  .sidebar { max-height: 60vh; overflow-y: auto; }
+  .content { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">筆</div>
+    <div>
+      <div class="logo-text">소설 제조기</div>
+      <div class="logo-sub">AI Novel Generator · DeepSeek</div>
+    </div>
+  </div>
+  <div class="api-row">
+    <div class="api-label">API Key</div>
+    <input class="api-input" id="apiKey" type="password" placeholder="sk-... (DeepSeek)">
+  </div>
+</header>
+
+<main>
+  <!-- ── 사이드바 ── -->
+  <div class="sidebar">
+
+    <!-- 참고 소설 -->
+    <div class="sidebar-section">
+      <div class="section-title">참고 소설 (문체 학습)</div>
+      <label for="refFileInput">소설 파일 업로드</label>
+      <label class="ref-upload-label" for="refFileInput">📄 파일을 탭하여 선택<br><small style="color:var(--text-muted);font-size:10px">.txt 지원</small></label>
+      <input type="file" id="refFileInput" accept=".txt">
+      <div class="ref-loaded" id="refLoaded">✅ 문체 학습 완료</div>
+    </div>
+
+    <!-- 소설 기본 설정 -->
+    <div class="sidebar-section">
+      <div class="section-title">소설 설정</div>
+
+      <label>소설 제목</label>
+      <input type="text" id="novelTitle" placeholder="제목 입력...">
+
+      <label>주제 / 핵심 설정</label>
+      <textarea id="novelTheme" placeholder="이 소설의 주된 테마, 세계관, 핵심 갈등을 적어주세요..."></textarea>
+
+      <label>장르 / 분위기</label>
+      <select id="novelGenre">
+        <option value="성인 로맨스">성인 로맨스</option>
+        <option value="성인 판타지">성인 판타지</option>
+        <option value="성인 현대물">성인 현대물</option>
+        <option value="성인 학원물">성인 학원물</option>
+        <option value="성인 이세계">성인 이세계</option>
+        <option value="성인 스릴러">성인 스릴러</option>
+      </select>
+
+      <label>1화 최소 분량 (줄)</label>
+      <input type="number" id="minLines" value="100" min="30" max="500">
+
+      <label>문체 스타일</label>
+      <select id="styleType">
+        <option value="한국 웹소설체">한국 웹소설체</option>
+        <option value="문학적 순문학체">문학적 순문학체</option>
+        <option value="중국 웹소설 번역체">중국 웹소설 번역체</option>
+        <option value="직접적이고 빠른 전개">직접적이고 빠른 전개</option>
+      </select>
+    </div>
+
+    <!-- 등장인물 -->
+    <div class="sidebar-section">
+      <div class="section-title">등장인물</div>
+      <div class="characters-list" id="charList"></div>
+
+      <div class="char-add-row" style="margin-top:12px">
+        <input type="text" id="charName" placeholder="이름">
+        <input type="text" id="charRole" placeholder="역할" style="max-width:90px">
+      </div>
+      <textarea id="charDesc" placeholder="외모, 성격, 배경 등..." style="margin-top:6px;min-height:60px"></textarea>
+      <button class="btn-sm" onclick="addCharacter()" style="margin-top:8px;width:100%">+ 인물 추가</button>
+    </div>
+
+    <!-- 추가 지시 -->
+    <div class="sidebar-section">
+      <div class="section-title">추가 지시사항</div>
+      <textarea id="extraInstructions" placeholder="AI에게 추가로 전달할 지시사항 (예: 1인칭 시점, 특정 금기사항 등)..." style="min-height:80px"></textarea>
+    </div>
+
+  </div>
+
+  <!-- ── 콘텐츠 ── -->
+  <div class="content">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('generate')">✍️ 화 생성</button>
+      <button class="tab-btn" onclick="switchTab('result')">📖 결과 보기</button>
+      <button class="tab-btn" onclick="switchTab('history')">📚 히스토리</button>
+    </div>
+
+    <!-- 생성 탭 -->
+    <div class="panel active" id="panel-generate">
+      <div class="generate-panel">
+
+        <div class="episode-controls">
+          <div class="episode-num">화 번호</div>
+          <input type="number" id="episodeNum" value="1" min="1" style="width:80px">
+          <button class="btn-sm" onclick="prevEp()">◀ 이전</button>
+          <button class="btn-sm" onclick="nextEp()">다음 ▶</button>
+        </div>
+
+        <div class="plot-input">
+          <div class="section-title" style="margin-bottom:8px">이번 화 줄거리 / 방향</div>
+          <textarea id="episodePlot" placeholder="이번 화에서 일어날 사건, 감정선, 장면을 간략히 적어주세요.&#10;예: 주인공이 처음으로 히로인과 단둘이 남겨지는 상황에서..."></textarea>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <label style="margin-top:0">이전 화 이어쓰기</label>
+              <select id="continueMode">
+                <option value="no">새로 시작</option>
+                <option value="yes">이전 화 이어서</option>
+              </select>
+            </div>
+            <div>
+              <label style="margin-top:0">성인 묘사 강도</label>
+              <select id="adultLevel">
+                <option value="암시적">암시적 (은근하게)</option>
+                <option value="중간">중간 (명확하게)</option>
+                <option value="강함" selected>강함 (직접적으로)</option>
+                <option value="없음">없음</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-generate" id="btnGenerate" onclick="generateEpisode()">▶ 이 화 생성하기</button>
+
+        <div class="statusbar" style="border-top:none;padding:0;background:none">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusMsg">설정을 입력하고 생성을 시작하세요</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 결과 탭 -->
+    <div class="panel" id="panel-result">
+      <div class="result-panel">
+        <div class="result-toolbar">
+          <div class="episode-badge" id="resultBadge">—</div>
+          <button class="btn-ghost" onclick="downloadEpisode()">TXT 저장</button>
+          <button class="btn-ghost" onclick="copyEpisode()">복사</button>
+          <button class="btn-ghost" onclick="downloadAll()">전체 저장</button>
+        </div>
+        <div class="result-text empty" id="resultText">생성된 내용이 없습니다</div>
+      </div>
+    </div>
+
+    <!-- 히스토리 탭 -->
+    <div class="panel" id="panel-history">
+      <div class="history-panel" id="historyList">
+        <div class="history-empty">아직 생성된 화가 없습니다</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────
+let characters = [];
+let history = []; // [{ep, title, content}]
+let refText = '';
+let currentResult = '';
+let currentEp = 1;
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['generate','result','history'][i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'history') renderHistory();
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────
+function setStatus(msg, state='idle') {
+  document.getElementById('statusMsg').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state !== 'idle' ? ' ' + state : '');
+}
+
+// ── 참고 파일 ─────────────────────────────────────────────────────────────
+document.getElementById('refFileInput').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    refText = e.target.result.substring(0, 8000); // 앞 8000자만 문체 참고
+    document.getElementById('refLoaded').style.display = 'block';
+    setStatus('참고 소설 로드 완료 — 문체 학습됨', 'done');
+  };
+  reader.readAsText(file, 'utf-8');
+});
+
+// ── 인물 관리 ─────────────────────────────────────────────────────────────
+function addCharacter() {
+  const name = document.getElementById('charName').value.trim();
+  const role = document.getElementById('charRole').value.trim();
+  const desc = document.getElementById('charDesc').value.trim();
+  if (!name) { alert('이름을 입력해주세요'); return; }
+  characters.push({ name, role, desc });
+  document.getElementById('charName').value = '';
+  document.getElementById('charRole').value = '';
+  document.getElementById('charDesc').value = '';
+  renderChars();
+}
+
+function removeChar(i) {
+  characters.splice(i, 1);
+  renderChars();
+}
+
+function renderChars() {
+  const el = document.getElementById('charList');
+  if (characters.length === 0) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;font-family:DM Mono,monospace">등장인물 없음</div>'; return; }
+  el.innerHTML = characters.map((c, i) => `
+    <div class="char-card">
+      <div>
+        <div class="char-name">${c.name}</div>
+        <div class="char-role">${c.role || '역할 미지정'}</div>
+      </div>
+      <button class="char-del" onclick="removeChar(${i})">×</button>
+    </div>
+  `).join('');
+}
+renderChars();
+
+// ── 화 번호 ──────────────────────────────────────────────────────────────
+function prevEp() {
+  const n = document.getElementById('episodeNum');
+  if (parseInt(n.value) > 1) n.value = parseInt(n.value) - 1;
+}
+function nextEp() {
+  const n = document.getElementById('episodeNum');
+  n.value = parseInt(n.value) + 1;
+}
+
+// ── 시스템 프롬프트 빌더 ──────────────────────────────────────────────────
+function buildSystemPrompt() {
+  const title = document.getElementById('novelTitle').value.trim() || '제목 없음';
+  const theme = document.getElementById('novelTheme').value.trim();
+  const genre = document.getElementById('novelGenre').value;
+  const minLines = document.getElementById('minLines').value;
+  const style = document.getElementById('styleType').value;
+  const extra = document.getElementById('extraInstructions').value.trim();
+  const adultLevel = document.getElementById('adultLevel').value;
+
+  let charSection = '';
+  if (characters.length > 0) {
+    charSection = '\n\n## 등장인물\n' + characters.map(c =>
+      `- ${c.name}${c.role ? ` (${c.role})` : ''}${c.desc ? `: ${c.desc}` : ''}`
+    ).join('\n');
+  }
+
+  let refSection = '';
+  if (refText) {
+    refSection = `\n\n## 참고 문체 (아래 소설의 문체와 어투를 최대한 따라서 작성하라)\n---\n${refText}\n---`;
+  }
+
+  let adultInstruction = '';
+  if (adultLevel !== '없음') {
+    adultInstruction = `\n\n## 성인 묘사 지침\n- 성인 장면은 "${adultLevel}" 강도로 묘사한다.\n- 성인 묘사를 축약하거나 생략하지 않는다. 원하는 장면이 나오면 충분히 길고 구체적으로 묘사한다.\n- 신체 묘사, 감각 묘사, 심리 묘사를 모두 포함한다.`;
+  }
+
+  return `당신은 한국 성인 소설 전문 작가입니다.
+
+## 소설 기본 정보
+- 제목: ${title}
+- 장르: ${genre}
+- 문체: ${style}
+- 주제/설정: ${theme || '자유'}
+${charSection}
+
+## 작성 규칙
+- 반드시 ${minLines}줄 이상 작성한다. 분량을 절대 줄이지 않는다.
+- 자연스럽고 몰입감 있는 한국 소설 문체로 작성한다.
+- 대화, 묘사, 심리 묘사를 균형 있게 배치한다.
+- 챕터 제목이나 화 번호를 본문에 넣지 않는다.
+- 소설 본문만 출력한다. 설명이나 메모를 달지 않는다.
+${adultInstruction}
+${refSection}
+${extra ? `\n## 추가 지시사항\n${extra}` : ''}`;
+}
+
+// ── 생성 ──────────────────────────────────────────────────────────────────
+async function generateEpisode() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { setStatus('API 키를 입력해주세요', 'error'); return; }
+
+  const ep = parseInt(document.getElementById('episodeNum').value);
+  const plot = document.getElementById('episodePlot').value.trim();
+  const continueMode = document.getElementById('continueMode').value;
+
+  if (!plot) { setStatus('이번 화 줄거리를 입력해주세요', 'error'); return; }
+
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+  setStatus(`제${ep}화 생성 중...`, 'working');
+
+  // 이전 화 내용
+  let prevContent = '';
+  if (continueMode === 'yes' && history.length > 0) {
+    const prev = history[history.length - 1];
+    prevContent = `\n\n## 이전 화 마지막 내용 (자연스럽게 이어서 작성)\n${prev.content.slice(-1000)}`;
+  }
+
+  const userMsg = `제${ep}화를 작성해주세요.\n\n이번 화 방향: ${plot}${prevContent}`;
+
+  try {
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        max_tokens: 4000,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: userMsg }
+        ]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API 오류 (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    currentResult = content;
+    currentEp = ep;
+
+    // 히스토리 저장
+    const existing = history.findIndex(h => h.ep === ep);
+    const title = document.getElementById('novelTitle').value.trim() || '소설';
+    if (existing >= 0) history[existing] = { ep, title, content };
+    else history.push({ ep, title, content });
+
+    // 결과 표시
+    const resultEl = document.getElementById('resultText');
+    resultEl.classList.remove('empty');
+    resultEl.textContent = content;
+    document.getElementById('resultBadge').textContent = `제${ep}화`;
+
+    // 결과 탭으로 이동
+    switchTab('result');
+    setStatus(`제${ep}화 생성 완료 — ${content.length.toLocaleString()}자`, 'done');
+
+    // 다음 화로 자동 이동
+    document.getElementById('episodeNum').value = ep + 1;
+    document.getElementById('episodePlot').value = '';
+
+  } catch(e) {
+    setStatus('오류: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ 이 화 생성하기';
+  }
+}
+
+// ── 다운로드 / 복사 ──────────────────────────────────────────────────────
+function downloadEpisode() {
+  if (!currentResult) return;
+  const title = document.getElementById('novelTitle').value.trim() || '소설';
+  const blob = new Blob([currentResult], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title}_제${currentEp}화.txt`;
+  a.click();
+}
+
+function copyEpisode() {
+  if (!currentResult) return;
+  navigator.clipboard.writeText(currentResult).then(() => {
+    setStatus('클립보드에 복사됨', 'done');
+  });
+}
+
+function downloadAll() {
+  if (history.length === 0) { setStatus('저장할 내용이 없습니다', 'error'); return; }
+  const title = document.getElementById('novelTitle').value.trim() || '소설';
+  const all = history
+    .sort((a, b) => a.ep - b.ep)
+    .map(h => `\n\n\n===== 제${h.ep}화 =====\n\n${h.content}`)
+    .join('');
+  const blob = new Blob([title + all], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title}_전체.txt`;
+  a.click();
+}
+
+// ── 히스토리 렌더 ────────────────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (history.length === 0) {
+    el.innerHTML = '<div class="history-empty">아직 생성된 화가 없습니다</div>';
+    return;
+  }
+  el.innerHTML = history
+    .sort((a, b) => a.ep - b.ep)
+    .map(h => `
+      <div class="history-item" onclick="loadHistory(${h.ep})">
+        <div class="history-ep">제${h.ep}화 · ${h.title}</div>
+        <div class="history-preview">${h.content.substring(0, 120)}...</div>
+      </div>
+    `).join('');
+}
+
+function loadHistory(ep) {
+  const h = history.find(x => x.ep === ep);
+  if (!h) return;
+  currentResult = h.content;
+  currentEp = h.ep;
+  const resultEl = document.getElementById('resultText');
+  resultEl.classList.remove('empty');
+  resultEl.textContent = h.content;
+  document.getElementById('resultBadge').textContent = `제${h.ep}화`;
+  switchTab('result');
+}
+</script>
+</body>
+</html>
