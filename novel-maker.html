@@ -146,7 +146,47 @@ select option { background: var(--surface); }
 
 textarea { min-height: 80px; line-height: 1.7; }
 
-/* 인물 카드 */
+/* 참고 소설 목록 */
+.ref-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.ref-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 7px 10px; gap: 8px;
+}
+.ref-item-name { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--green); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-item-size { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.ref-item-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 2px; transition: color 0.2s; }
+.ref-item-del:hover { color: var(--accent); }
+
+
+.genre-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.genre-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: all 0.2s;
+  user-select: none;
+}
+.genre-chip:hover { border-color: var(--accent-dim); color: var(--text); }
+.genre-chip input[type="checkbox"] { display: none; }
+.genre-chip:has(input:checked) {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+
 .characters-list { display: flex; flex-direction: column; gap: 8px; }
 .char-card {
   background: var(--bg);
@@ -399,7 +439,67 @@ textarea { min-height: 80px; line-height: 1.7; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border-bright); }
 
-/* 모바일 */
+/* 설정 슬롯 */
+.preset-slot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preset-slot.filled { border-color: var(--border-bright); }
+.preset-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.preset-slot-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-dim);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+.preset-slot-name {
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+  font-weight: 600;
+}
+.preset-slot-empty {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.preset-slot-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.preset-slot-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.preset-name-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  display: none;
+}
+.preset-name-input.visible { display: block; }
+
+
 @media (max-width: 700px) {
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow: visible; }
   .sidebar { max-height: 60vh; overflow-y: auto; }
@@ -430,10 +530,9 @@ textarea { min-height: 80px; line-height: 1.7; }
     <!-- 참고 소설 -->
     <div class="sidebar-section">
       <div class="section-title">참고 소설 (문체 학습)</div>
-      <label for="refFileInput">소설 파일 업로드</label>
-      <label class="ref-upload-label" for="refFileInput">📄 파일을 탭하여 선택<br><small style="color:var(--text-muted);font-size:10px">.txt 지원</small></label>
-      <input type="file" id="refFileInput" accept=".txt">
-      <div class="ref-loaded" id="refLoaded">✅ 문체 학습 완료</div>
+      <input type="file" id="refFileInput" accept=".txt" multiple style="display:none">
+      <label class="ref-upload-label" for="refFileInput">📄 파일을 탭하여 선택 (여러 개 가능)<br><small style="color:var(--text-muted);font-size:10px">.txt 지원 · 여러 파일 동시 선택 가능</small></label>
+      <div class="ref-list" id="refList"></div>
     </div>
 
     <!-- 소설 기본 설정 -->
@@ -443,18 +542,35 @@ textarea { min-height: 80px; line-height: 1.7; }
       <label>소설 제목</label>
       <input type="text" id="novelTitle" placeholder="제목 입력...">
 
-      <label>주제 / 핵심 설정</label>
-      <textarea id="novelTheme" placeholder="이 소설의 주된 테마, 세계관, 핵심 갈등을 적어주세요..."></textarea>
+      <label>주제 / 핵심 설정 (중복 선택 가능)</label>
+      <div class="genre-grid" id="themeGrid">
+        <label class="genre-chip"><input type="checkbox" value="스타킹·란제리 페티시"> 스타킹·란제리</label>
+        <label class="genre-chip"><input type="checkbox" value="조교·길들이기"> 조교·길들이기</label>
+        <label class="genre-chip"><input type="checkbox" value="NTR·불륜"> NTR·불륜</label>
+        <label class="genre-chip"><input type="checkbox" value="근친·금지된 관계"> 근친·금지된 관계</label>
+        <label class="genre-chip"><input type="checkbox" value="지배와 복종·SM"> 지배·복종(SM)</label>
+        <label class="genre-chip"><input type="checkbox" value="처녀·순수한 상대"> 처녀·순수함</label>
+        <label class="genre-chip"><input type="checkbox" value="연상연하·나이차"> 연상연하·나이차</label>
+        <label class="genre-chip"><input type="checkbox" value="직장·상하관계"> 직장·상하관계</label>
+        <label class="genre-chip"><input type="checkbox" value="하렘·다수관계"> 하렘·다수관계</label>
+        <label class="genre-chip"><input type="checkbox" value="순애·집착사랑"> 순애·집착사랑</label>
+      </div>
+      <label style="margin-top:10px">추가 설정 (직접 입력)</label>
+      <textarea id="novelTheme" placeholder="위에서 선택 외 추가 설정, 세계관, 핵심 갈등 등을 자유롭게 적어주세요..."></textarea>
 
-      <label>장르 / 분위기</label>
-      <select id="novelGenre">
-        <option value="성인 로맨스">성인 로맨스</option>
-        <option value="성인 판타지">성인 판타지</option>
-        <option value="성인 현대물">성인 현대물</option>
-        <option value="성인 학원물">성인 학원물</option>
-        <option value="성인 이세계">성인 이세계</option>
-        <option value="성인 스릴러">성인 스릴러</option>
-      </select>
+      <label>장르 / 분위기 (중복 선택 가능)</label>
+      <div class="genre-grid" id="genreGrid">
+        <label class="genre-chip"><input type="checkbox" value="로맨스"> 로맨스</label>
+        <label class="genre-chip"><input type="checkbox" value="판타지"> 판타지</label>
+        <label class="genre-chip"><input type="checkbox" value="현대물"> 현대물</label>
+        <label class="genre-chip"><input type="checkbox" value="학원물"> 학원물</label>
+        <label class="genre-chip"><input type="checkbox" value="이세계"> 이세계</label>
+        <label class="genre-chip"><input type="checkbox" value="스릴러"> 스릴러</label>
+        <label class="genre-chip"><input type="checkbox" value="NTR"> NTR</label>
+        <label class="genre-chip"><input type="checkbox" value="하렘"> 하렘</label>
+        <label class="genre-chip"><input type="checkbox" value="금지된사랑"> 금지된 사랑</label>
+        <label class="genre-chip"><input type="checkbox" value="지배와복종"> 지배·복종</label>
+      </div>
 
       <label>1화 최소 분량 (줄)</label>
       <input type="number" id="minLines" value="100" min="30" max="500">
@@ -495,6 +611,7 @@ textarea { min-height: 80px; line-height: 1.7; }
       <button class="tab-btn active" onclick="switchTab('generate')">✍️ 화 생성</button>
       <button class="tab-btn" onclick="switchTab('result')">📖 결과 보기</button>
       <button class="tab-btn" onclick="switchTab('history')">📚 히스토리</button>
+      <button class="tab-btn" onclick="switchTab('preset')">💾 설정 저장</button>
     </div>
 
     <!-- 생성 탭 -->
@@ -562,25 +679,34 @@ textarea { min-height: 80px; line-height: 1.7; }
       </div>
     </div>
 
+    <!-- 설정 저장 탭 -->
+    <div class="panel" id="panel-preset">
+      <div class="generate-panel">
+        <div class="section-title">설정 슬롯 (최대 5개)</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:8px">현재 설정을 슬롯에 저장하거나, 슬롯을 불러와 바로 집필할 수 있어요.</div>
+        <div id="presetSlots" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
   </div>
 </main>
 
 <script>
 // ── STATE ─────────────────────────────────────────────────────────────────
 let characters = [];
-let history = []; // [{ep, title, content}]
-let refText = '';
+let history = [];
 let currentResult = '';
 let currentEp = 1;
 
 // ── TABS ──────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
-    b.classList.toggle('active', ['generate','result','history'][i] === tab);
+    b.classList.toggle('active', ['generate','result','history','preset'][i] === tab);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   if (tab === 'history') renderHistory();
+  if (tab === 'preset') renderPresets();
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────
@@ -590,18 +716,54 @@ function setStatus(msg, state='idle') {
   dot.className = 'status-dot' + (state !== 'idle' ? ' ' + state : '');
 }
 
-// ── 참고 파일 ─────────────────────────────────────────────────────────────
+// ── 참고 파일 (여러 개) ───────────────────────────────────────────────────
+let refFiles = []; // [{name, text}]
+
 document.getElementById('refFileInput').addEventListener('change', function() {
-  const file = this.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    refText = e.target.result.substring(0, 8000); // 앞 8000자만 문체 참고
-    document.getElementById('refLoaded').style.display = 'block';
-    setStatus('참고 소설 로드 완료 — 문체 학습됨', 'done');
-  };
-  reader.readAsText(file, 'utf-8');
+  const files = [...this.files];
+  if (!files.length) return;
+
+  let loaded = 0;
+  files.forEach(file => {
+    // 이미 추가된 파일은 스킵
+    if (refFiles.find(r => r.name === file.name)) { loaded++; checkDone(); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      refFiles.push({ name: file.name, text: e.target.result });
+      loaded++;
+      checkDone();
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+
+  function checkDone() {
+    if (loaded === files.length) {
+      renderRefList();
+      setStatus(`참고 소설 ${refFiles.length}개 로드 완료`, 'done');
+    }
+  }
+
+  // input 초기화 (같은 파일 재선택 가능하게)
+  this.value = '';
 });
+
+function removeRef(name) {
+  refFiles = refFiles.filter(r => r.name !== name);
+  renderRefList();
+  setStatus(refFiles.length > 0 ? `참고 소설 ${refFiles.length}개` : '참고 소설 없음');
+}
+
+function renderRefList() {
+  const el = document.getElementById('refList');
+  if (refFiles.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = refFiles.map(r => `
+    <div class="ref-item">
+      <div class="ref-item-name">✅ ${r.name}</div>
+      <div class="ref-item-size">${Math.round(r.text.length/100)/10}KB</div>
+      <button class="ref-item-del" onclick="removeRef('${r.name.replace(/'/g,"\\'")}')">×</button>
+    </div>
+  `).join('');
+}
 
 // ── 인물 관리 ─────────────────────────────────────────────────────────────
 function addCharacter() {
@@ -650,22 +812,36 @@ function nextEp() {
 function buildSystemPrompt() {
   const title = document.getElementById('novelTitle').value.trim() || '제목 없음';
   const theme = document.getElementById('novelTheme').value.trim();
-  const genre = document.getElementById('novelGenre').value;
+
+  // 주제 체크박스
+  const checkedThemes = [...document.querySelectorAll('#themeGrid input:checked')].map(i => i.value);
+  const themeStr = [
+    ...(checkedThemes.length > 0 ? checkedThemes : []),
+    ...(theme ? [theme] : [])
+  ].join(', ') || '자유';
   const minLines = document.getElementById('minLines').value;
   const style = document.getElementById('styleType').value;
   const extra = document.getElementById('extraInstructions').value.trim();
   const adultLevel = document.getElementById('adultLevel').value;
 
+  // 장르 체크박스
+  const checkedGenres = [...document.querySelectorAll('#genreGrid input:checked')].map(i => i.value);
+  const genre = checkedGenres.length > 0 ? checkedGenres.join(', ') : '성인 소설';
+
+  // 등장인물 — 프롬프트에 강하게 주입
   let charSection = '';
   if (characters.length > 0) {
-    charSection = '\n\n## 등장인물\n' + characters.map(c =>
-      `- ${c.name}${c.role ? ` (${c.role})` : ''}${c.desc ? `: ${c.desc}` : ''}`
-    ).join('\n');
+    charSection = `\n\n## 등장인물 설정 (반드시 아래 인물들을 소설에 등장시켜라. 설정을 절대 임의로 바꾸지 마라)\n` +
+      characters.map((c, i) =>
+        `### ${i+1}. ${c.name}${c.role ? ` — ${c.role}` : ''}\n${c.desc ? c.desc : '(설명 없음)'}`
+      ).join('\n\n');
   }
 
   let refSection = '';
-  if (refText) {
-    refSection = `\n\n## 참고 문체 (아래 소설의 문체와 어투를 최대한 따라서 작성하라)\n---\n${refText}\n---`;
+  if (refFiles.length > 0) {
+    const charLimit = refFiles.length <= 3 ? 15000 : 5000;
+    refSection = `\n\n## 참고 소설 문체 (아래 소설들의 문체, 어투, 표현 방식을 최대한 따라서 작성하라)\n` +
+      refFiles.map((r, i) => `### 참고 소설 ${i+1}: ${r.name}\n---\n${r.text.substring(0, charLimit)}\n---`).join('\n\n');
   }
 
   let adultInstruction = '';
@@ -677,13 +853,14 @@ function buildSystemPrompt() {
 
 ## 소설 기본 정보
 - 제목: ${title}
-- 장르: ${genre}
+- 장르: 성인 ${genre}
 - 문체: ${style}
-- 주제/설정: ${theme || '자유'}
+- 주제/설정: ${themeStr}
 ${charSection}
 
 ## 작성 규칙
 - 반드시 ${minLines}줄 이상 작성한다. 분량을 절대 줄이지 않는다.
+- 등장인물의 이름, 외모, 성격, 역할을 설정 그대로 유지하며 일관되게 사용한다.
 - 자연스럽고 몰입감 있는 한국 소설 문체로 작성한다.
 - 대화, 묘사, 심리 묘사를 균형 있게 배치한다.
 - 챕터 제목이나 화 번호를 본문에 넣지 않는다.
@@ -806,7 +983,112 @@ function downloadAll() {
   a.click();
 }
 
-// ── 히스토리 렌더 ────────────────────────────────────────────────────────
+// ── 설정 저장/불러오기 ────────────────────────────────────────────────────
+const PRESET_KEY = 'novel_presets';
+let presets = JSON.parse(localStorage.getItem(PRESET_KEY) || 'null') || Array(5).fill(null);
+
+function gatherSettings() {
+  return {
+    name: document.getElementById('novelTitle').value.trim() || '설정 ' + new Date().toLocaleDateString('ko'),
+    novelTitle: document.getElementById('novelTitle').value,
+    novelTheme: document.getElementById('novelTheme').value,
+    novelGenres: [...document.querySelectorAll('#genreGrid input:checked')].map(i => i.value),
+    novelThemes: [...document.querySelectorAll('#themeGrid input:checked')].map(i => i.value),
+    minLines: document.getElementById('minLines').value,
+    styleType: document.getElementById('styleType').value,
+    extraInstructions: document.getElementById('extraInstructions').value,
+    adultLevel: document.getElementById('adultLevel').value,
+    characters: JSON.parse(JSON.stringify(characters)),
+    savedAt: new Date().toLocaleString('ko')
+  };
+}
+
+function applySettings(s) {
+  document.getElementById('novelTitle').value = s.novelTitle || '';
+  document.getElementById('novelTheme').value = s.novelTheme || '';
+  document.getElementById('minLines').value = s.minLines || 100;
+  document.getElementById('styleType').value = s.styleType || '한국 웹소설체';
+  document.getElementById('extraInstructions').value = s.extraInstructions || '';
+  document.getElementById('adultLevel').value = s.adultLevel || '강함';
+
+  // 장르 체크박스
+  document.querySelectorAll('#genreGrid input').forEach(cb => {
+    cb.checked = (s.novelGenres || []).includes(cb.value);
+  });
+  // 주제 체크박스
+  document.querySelectorAll('#themeGrid input').forEach(cb => {
+    cb.checked = (s.novelThemes || []).includes(cb.value);
+  });
+  // 등장인물
+  characters = s.characters || [];
+  renderChars();
+}
+
+function savePreset(idx) {
+  const nameInput = document.getElementById(`preset-name-${idx}`);
+  const customName = nameInput ? nameInput.value.trim() : '';
+  const settings = gatherSettings();
+  if (customName) settings.name = customName;
+  presets[idx] = settings;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1}에 저장 완료`, 'done');
+}
+
+function loadPreset(idx) {
+  const s = presets[idx];
+  if (!s) return;
+  applySettings(s);
+  switchTab('generate');
+  setStatus(`슬롯 ${idx+1} "${s.name}" 불러옴`, 'done');
+}
+
+function deletePreset(idx) {
+  presets[idx] = null;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1} 삭제됨`);
+}
+
+function renderPresets() {
+  const el = document.getElementById('presetSlots');
+  el.innerHTML = presets.map((p, i) => {
+    if (!p) return `
+      <div class="preset-slot" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-empty">비어 있음</div>
+        </div>
+        <input class="preset-name-input visible" id="preset-name-${i}" type="text" placeholder="설정 이름 입력...">
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="savePreset(${i})">💾 현재 설정 저장</button>
+        </div>
+      </div>`;
+
+    const genres = (p.novelGenres||[]).join(', ') || '—';
+    const themes = (p.novelThemes||[]).join(', ') || '—';
+    const chars = (p.characters||[]).map(c=>c.name).join(', ') || '—';
+    return `
+      <div class="preset-slot filled" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-name">${p.name}</div>
+        </div>
+        <div class="preset-slot-meta">
+          장르: ${genres}<br>
+          주제: ${themes}<br>
+          인물: ${chars}<br>
+          저장: ${p.savedAt}
+        </div>
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="loadPreset(${i})" style="background:var(--accent)">▶ 불러와서 집필</button>
+          <button class="btn-sm" onclick="savePreset(${i})">🔄 덮어쓰기</button>
+          <button class="btn-sm" onclick="deletePreset(${i})" style="background:var(--accent-dim)">🗑 삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+renderPresets();
 function renderHistory() {
   const el = document.getElementById('historyList');
   if (history.length === 0) {
