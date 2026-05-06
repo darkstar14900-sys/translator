@@ -439,7 +439,67 @@ textarea { min-height: 80px; line-height: 1.7; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border-bright); }
 
-/* 모바일 */
+/* 설정 슬롯 */
+.preset-slot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preset-slot.filled { border-color: var(--border-bright); }
+.preset-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.preset-slot-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-dim);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+.preset-slot-name {
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+  font-weight: 600;
+}
+.preset-slot-empty {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.preset-slot-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.preset-slot-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.preset-name-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  display: none;
+}
+.preset-name-input.visible { display: block; }
+
+
 @media (max-width: 700px) {
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow: visible; }
   .sidebar { max-height: 60vh; overflow-y: auto; }
@@ -551,6 +611,7 @@ textarea { min-height: 80px; line-height: 1.7; }
       <button class="tab-btn active" onclick="switchTab('generate')">✍️ 화 생성</button>
       <button class="tab-btn" onclick="switchTab('result')">📖 결과 보기</button>
       <button class="tab-btn" onclick="switchTab('history')">📚 히스토리</button>
+      <button class="tab-btn" onclick="switchTab('preset')">💾 설정 저장</button>
     </div>
 
     <!-- 생성 탭 -->
@@ -618,6 +679,15 @@ textarea { min-height: 80px; line-height: 1.7; }
       </div>
     </div>
 
+    <!-- 설정 저장 탭 -->
+    <div class="panel" id="panel-preset">
+      <div class="generate-panel">
+        <div class="section-title">설정 슬롯 (최대 5개)</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:8px">현재 설정을 슬롯에 저장하거나, 슬롯을 불러와 바로 집필할 수 있어요.</div>
+        <div id="presetSlots" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -631,11 +701,12 @@ let currentEp = 1;
 // ── TABS ──────────────────────────────────────────────────────────────────
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => {
-    b.classList.toggle('active', ['generate','result','history'][i] === tab);
+    b.classList.toggle('active', ['generate','result','history','preset'][i] === tab);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   if (tab === 'history') renderHistory();
+  if (tab === 'preset') renderPresets();
 }
 
 // ── STATUS ────────────────────────────────────────────────────────────────
@@ -788,7 +859,8 @@ function buildSystemPrompt() {
 ${charSection}
 
 ## 작성 규칙
-- 반드시 ${minLines}줄 이상 작성한다. 분량을 절대 줄이지 않는다.
+- 반드시 ${minLines}줄 이상 작성한다. 줄 수를 채우기 위해 억지로 끊지 말고, 내용이 자연스럽게 마무리될 때까지 계속 써라. 문장이 중간에 끊기면 절대 안 된다.
+- 분량이 부족하면 묘사, 심리, 대화를 더 추가해서 반드시 ${minLines}줄을 넘겨라.
 - 등장인물의 이름, 외모, 성격, 역할을 설정 그대로 유지하며 일관되게 사용한다.
 - 자연스럽고 몰입감 있는 한국 소설 문체로 작성한다.
 - 대화, 묘사, 심리 묘사를 균형 있게 배치한다.
@@ -815,11 +887,27 @@ async function generateEpisode() {
   btn.textContent = '생성 중...';
   setStatus(`제${ep}화 생성 중...`, 'working');
 
-  // 이전 화 내용
+  // 이전 화 내용 — 화 번호 기준으로 정확하게 가져오기
   let prevContent = '';
-  if (continueMode === 'yes' && history.length > 0) {
-    const prev = history[history.length - 1];
-    prevContent = `\n\n## 이전 화 마지막 내용 (자연스럽게 이어서 작성)\n${prev.content.slice(-1000)}`;
+  if (continueMode === 'yes') {
+    const prevEpisode = history.find(h => h.ep === ep - 1);
+    if (prevEpisode) {
+      // 이전 화 앞부분 + 뒷부분 모두 전달해서 맥락 확보
+      const text = prevEpisode.content;
+      const head = text.slice(0, 1500);
+      const tail = text.slice(-1500);
+      const mid = text.length > 3000 ? '\n...(중략)...\n' : '';
+      prevContent = `\n\n## 이전 화(제${ep-1}화) 내용 — 반드시 이 내용과 자연스럽게 이어서 작성하라\n${head}${mid}${tail}`;
+    } else {
+      // 이전 화가 없으면 가장 최근 화로 대체
+      const sorted = [...history].sort((a,b) => b.ep - a.ep);
+      if (sorted.length > 0) {
+        const last = sorted[0];
+        const text = last.content;
+        const tail = text.slice(-2000);
+        prevContent = `\n\n## 직전 화(제${last.ep}화) 내용 — 반드시 이 내용과 자연스럽게 이어서 작성하라\n${tail}`;
+      }
+    }
   }
 
   const userMsg = `제${ep}화를 작성해주세요.\n\n이번 화 방향: ${plot}${prevContent}`;
@@ -833,7 +921,7 @@ async function generateEpisode() {
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
-        max_tokens: 4000,
+        max_tokens: 8000,
         messages: [
           { role: 'system', content: buildSystemPrompt() },
           { role: 'user', content: userMsg }
@@ -912,7 +1000,112 @@ function downloadAll() {
   a.click();
 }
 
-// ── 히스토리 렌더 ────────────────────────────────────────────────────────
+// ── 설정 저장/불러오기 ────────────────────────────────────────────────────
+const PRESET_KEY = 'novel_presets';
+let presets = JSON.parse(localStorage.getItem(PRESET_KEY) || 'null') || Array(5).fill(null);
+
+function gatherSettings() {
+  return {
+    name: document.getElementById('novelTitle').value.trim() || '설정 ' + new Date().toLocaleDateString('ko'),
+    novelTitle: document.getElementById('novelTitle').value,
+    novelTheme: document.getElementById('novelTheme').value,
+    novelGenres: [...document.querySelectorAll('#genreGrid input:checked')].map(i => i.value),
+    novelThemes: [...document.querySelectorAll('#themeGrid input:checked')].map(i => i.value),
+    minLines: document.getElementById('minLines').value,
+    styleType: document.getElementById('styleType').value,
+    extraInstructions: document.getElementById('extraInstructions').value,
+    adultLevel: document.getElementById('adultLevel').value,
+    characters: JSON.parse(JSON.stringify(characters)),
+    savedAt: new Date().toLocaleString('ko')
+  };
+}
+
+function applySettings(s) {
+  document.getElementById('novelTitle').value = s.novelTitle || '';
+  document.getElementById('novelTheme').value = s.novelTheme || '';
+  document.getElementById('minLines').value = s.minLines || 100;
+  document.getElementById('styleType').value = s.styleType || '한국 웹소설체';
+  document.getElementById('extraInstructions').value = s.extraInstructions || '';
+  document.getElementById('adultLevel').value = s.adultLevel || '강함';
+
+  // 장르 체크박스
+  document.querySelectorAll('#genreGrid input').forEach(cb => {
+    cb.checked = (s.novelGenres || []).includes(cb.value);
+  });
+  // 주제 체크박스
+  document.querySelectorAll('#themeGrid input').forEach(cb => {
+    cb.checked = (s.novelThemes || []).includes(cb.value);
+  });
+  // 등장인물
+  characters = s.characters || [];
+  renderChars();
+}
+
+function savePreset(idx) {
+  const nameInput = document.getElementById(`preset-name-${idx}`);
+  const customName = nameInput ? nameInput.value.trim() : '';
+  const settings = gatherSettings();
+  if (customName) settings.name = customName;
+  presets[idx] = settings;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1}에 저장 완료`, 'done');
+}
+
+function loadPreset(idx) {
+  const s = presets[idx];
+  if (!s) return;
+  applySettings(s);
+  switchTab('generate');
+  setStatus(`슬롯 ${idx+1} "${s.name}" 불러옴`, 'done');
+}
+
+function deletePreset(idx) {
+  presets[idx] = null;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1} 삭제됨`);
+}
+
+function renderPresets() {
+  const el = document.getElementById('presetSlots');
+  el.innerHTML = presets.map((p, i) => {
+    if (!p) return `
+      <div class="preset-slot" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-empty">비어 있음</div>
+        </div>
+        <input class="preset-name-input visible" id="preset-name-${i}" type="text" placeholder="설정 이름 입력...">
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="savePreset(${i})">💾 현재 설정 저장</button>
+        </div>
+      </div>`;
+
+    const genres = (p.novelGenres||[]).join(', ') || '—';
+    const themes = (p.novelThemes||[]).join(', ') || '—';
+    const chars = (p.characters||[]).map(c=>c.name).join(', ') || '—';
+    return `
+      <div class="preset-slot filled" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-name">${p.name}</div>
+        </div>
+        <div class="preset-slot-meta">
+          장르: ${genres}<br>
+          주제: ${themes}<br>
+          인물: ${chars}<br>
+          저장: ${p.savedAt}
+        </div>
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="loadPreset(${i})" style="background:var(--accent)">▶ 불러와서 집필</button>
+          <button class="btn-sm" onclick="savePreset(${i})">🔄 덮어쓰기</button>
+          <button class="btn-sm" onclick="deletePreset(${i})" style="background:var(--accent-dim)">🗑 삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+renderPresets();
 function renderHistory() {
   const el = document.getElementById('historyList');
   if (history.length === 0) {
