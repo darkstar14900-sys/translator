@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소설 제조기</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600;700&family=DM+Mono:wght@300;400&family=Noto+Serif+SC:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0808;
+  --surface: #130f0f;
+  --surface2: #1a1414;
+  --border: #2a1f1f;
+  --border-bright: #3d2a2a;
+  --accent: #c43a3a;
+  --accent-dim: #7a2020;
+  --accent-glow: rgba(196,58,58,0.15);
+  --text: #ede0d8;
+  --text-dim: #9a8078;
+  --text-muted: #4a3530;
+  --gold: #c9923a;
+  --green: #5a9a6a;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  color: #0a0808;
+  font-weight: 700;
+}
+.logo-text { font-size: 16px; letter-spacing: 3px; color: var(--text); }
+.logo-sub { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; letter-spacing: 1px; margin-top: 2px; }
+
+.api-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.api-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.api-input {
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 11px;
+  padding: 6px 10px; width: 180px; outline: none;
+}
+.api-input:focus { border-color: var(--accent-dim); }
+
+/* ── LAYOUT ── */
+main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0;
+  height: calc(100vh - 65px);
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+  padding: 20px;
+}
+.section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+label {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+  margin-top: 12px;
+}
+label:first-of-type { margin-top: 0; }
+
+input[type="text"], input[type="number"], textarea, select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus { border-color: var(--accent-dim); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+select { cursor: pointer; }
+select option { background: var(--surface); }
+
+textarea { min-height: 80px; line-height: 1.7; }
+
+/* 참고 소설 목록 */
+.ref-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.ref-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg); border: 1px solid var(--border);
+  padding: 7px 10px; gap: 8px;
+}
+.ref-item-name { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--green); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ref-item-size { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+.ref-item-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 0 2px; transition: color 0.2s; }
+.ref-item-del:hover { color: var(--accent); }
+
+
+.genre-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.genre-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: all 0.2s;
+  user-select: none;
+}
+.genre-chip:hover { border-color: var(--accent-dim); color: var(--text); }
+.genre-chip input[type="checkbox"] { display: none; }
+.genre-chip:has(input:checked) {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+
+.characters-list { display: flex; flex-direction: column; gap: 8px; }
+.char-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.char-name { font-size: 13px; color: var(--text); }
+.char-role { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--accent-dim); }
+.char-desc-preview { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
+.char-btns { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.char-del, .char-edit {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 13px; padding: 2px 5px;
+  transition: color 0.2s; white-space: nowrap;
+}
+.char-del:hover { color: var(--accent); }
+.char-edit:hover { color: var(--gold); }
+
+/* 인물 수정 폼 */
+.char-edit-form {
+  background: var(--bg);
+  border: 1px solid var(--accent-dim);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.char-edit-form input,
+.char-edit-form textarea {
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.char-edit-form textarea { min-height: 50px; }
+.char-edit-btns { display: flex; gap: 6px; }
+
+
+.char-add-row { display: flex; gap: 6px; margin-top: 8px; }
+.char-add-row input { flex: 1; }
+.btn-sm {
+  background: var(--accent-dim); border: none; color: var(--text);
+  font-family: 'Noto Serif KR', serif; font-size: 12px;
+  padding: 8px 12px; cursor: pointer; white-space: nowrap;
+  transition: background 0.2s;
+}
+.btn-sm:hover { background: var(--accent); }
+
+/* 참고 소설 */
+.ref-upload-label {
+  display: block;
+  border: 1px dashed var(--border-bright);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+.ref-upload-label:hover { border-color: var(--accent-dim); color: var(--accent); }
+#refFileInput { display: none; }
+.ref-loaded {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--green);
+  margin-top: 8px;
+  display: none;
+}
+
+/* ── CONTENT AREA ── */
+.content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 탭 */
+.tabs {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  background: var(--surface);
+  padding: 0 20px;
+}
+.tab-btn {
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 12px;
+  padding: 12px 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+  margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text-dim); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.panel { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.panel.active { display: flex; }
+
+/* 생성 패널 */
+.generate-panel {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.episode-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.episode-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.plot-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plot-input textarea {
+  min-height: 100px;
+  background: var(--bg);
+}
+
+/* 생성 버튼 */
+.btn-generate {
+  background: var(--accent);
+  border: none;
+  color: #0a0808;
+  font-family: 'Noto Serif KR', serif;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 14px 32px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+.btn-generate:hover { background: #d94a4a; }
+.btn-generate:disabled { background: var(--accent-dim); cursor: not-allowed; color: var(--text-muted); }
+
+/* 결과 패널 */
+.result-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.result-toolbar {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+}
+.result-toolbar .episode-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 4px 10px;
+  border: 1px solid var(--accent-dim);
+}
+.btn-ghost {
+  background: none; border: 1px solid var(--border-bright);
+  color: var(--text-dim); font-family: 'Noto Serif KR', serif;
+  font-size: 12px; padding: 6px 14px; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-ghost:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+.result-text {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  font-size: 15px;
+  line-height: 2.1;
+  color: var(--text);
+  white-space: pre-wrap;
+  font-family: 'Noto Serif KR', serif;
+}
+.result-text.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1px;
+}
+
+/* 히스토리 패널 */
+.history-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.history-item:hover { border-color: var(--accent-dim); }
+.history-ep {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.history-preview {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.history-empty {
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+/* 상태바 */
+.statusbar {
+  border-top: 1px solid var(--border);
+  padding: 8px 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.status-dot.working { background: var(--accent); animation: pulse 1s infinite; }
+.status-dot.done { background: var(--green); }
+.status-dot.error { background: var(--accent); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); }
+
+/* 설정 슬롯 */
+.preset-slot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.preset-slot.filled { border-color: var(--border-bright); }
+.preset-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.preset-slot-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-dim);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+.preset-slot-name {
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+  font-weight: 600;
+}
+.preset-slot-empty {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.preset-slot-meta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.preset-slot-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.preset-name-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Noto Serif KR', serif;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  display: none;
+}
+.preset-name-input.visible { display: block; }
+
+
+@media (max-width: 700px) {
+  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; overflow: visible; }
+  .sidebar { max-height: 60vh; overflow-y: auto; }
+  .content { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">筆</div>
+    <div>
+      <div class="logo-text">소설 제조기</div>
+      <div class="logo-sub">AI Novel Generator · DeepSeek</div>
+    </div>
+  </div>
+  <div class="api-row">
+    <div class="api-label">API Key</div>
+    <input class="api-input" id="apiKey" type="password" placeholder="sk-... (DeepSeek)">
+  </div>
+</header>
+
+<main>
+  <!-- ── 사이드바 ── -->
+  <div class="sidebar">
+
+    <!-- 참고 소설 -->
+    <div class="sidebar-section">
+      <div class="section-title">참고 소설 (문체 학습)</div>
+      <input type="file" id="refFileInput" accept=".txt" multiple style="display:none">
+      <label class="ref-upload-label" for="refFileInput">📄 파일을 탭하여 선택 (여러 개 가능)<br><small style="color:var(--text-muted);font-size:10px">.txt 지원 · 여러 파일 동시 선택 가능</small></label>
+      <div class="ref-list" id="refList"></div>
+    </div>
+
+    <!-- 소설 기본 설정 -->
+    <div class="sidebar-section">
+      <div class="section-title">소설 설정</div>
+
+      <label>소설 제목</label>
+      <input type="text" id="novelTitle" placeholder="제목 입력...">
+
+      <label>주제 / 핵심 설정 (중복 선택 가능)</label>
+      <div class="genre-grid" id="themeGrid">
+        <label class="genre-chip"><input type="checkbox" value="스타킹·란제리 페티시"> 스타킹·란제리</label>
+        <label class="genre-chip"><input type="checkbox" value="조교·길들이기"> 조교·길들이기</label>
+        <label class="genre-chip"><input type="checkbox" value="NTR·불륜"> NTR·불륜</label>
+        <label class="genre-chip"><input type="checkbox" value="근친·금지된 관계"> 근친·금지된 관계</label>
+        <label class="genre-chip"><input type="checkbox" value="지배와 복종·SM"> 지배·복종(SM)</label>
+        <label class="genre-chip"><input type="checkbox" value="처녀·순수한 상대"> 처녀·순수함</label>
+        <label class="genre-chip"><input type="checkbox" value="연상연하·나이차"> 연상연하·나이차</label>
+        <label class="genre-chip"><input type="checkbox" value="직장·상하관계"> 직장·상하관계</label>
+        <label class="genre-chip"><input type="checkbox" value="하렘·다수관계"> 하렘·다수관계</label>
+        <label class="genre-chip"><input type="checkbox" value="순애·집착사랑"> 순애·집착사랑</label>
+      </div>
+      <label style="margin-top:10px">추가 설정 (직접 입력)</label>
+      <textarea id="novelTheme" placeholder="위에서 선택 외 추가 설정, 세계관, 핵심 갈등 등을 자유롭게 적어주세요..."></textarea>
+
+      <label>장르 / 분위기 (중복 선택 가능)</label>
+      <div class="genre-grid" id="genreGrid">
+        <label class="genre-chip"><input type="checkbox" value="로맨스"> 로맨스</label>
+        <label class="genre-chip"><input type="checkbox" value="판타지"> 판타지</label>
+        <label class="genre-chip"><input type="checkbox" value="현대물"> 현대물</label>
+        <label class="genre-chip"><input type="checkbox" value="학원물"> 학원물</label>
+        <label class="genre-chip"><input type="checkbox" value="이세계"> 이세계</label>
+        <label class="genre-chip"><input type="checkbox" value="스릴러"> 스릴러</label>
+        <label class="genre-chip"><input type="checkbox" value="NTR"> NTR</label>
+        <label class="genre-chip"><input type="checkbox" value="하렘"> 하렘</label>
+        <label class="genre-chip"><input type="checkbox" value="금지된사랑"> 금지된 사랑</label>
+        <label class="genre-chip"><input type="checkbox" value="지배와복종"> 지배·복종</label>
+      </div>
+
+      <label>1화 최소 분량 (줄)</label>
+      <input type="number" id="minLines" value="100" min="30" max="500">
+
+      <label>문체 스타일</label>
+      <select id="styleType">
+        <option value="한국 웹소설체">한국 웹소설체</option>
+        <option value="문학적 순문학체">문학적 순문학체</option>
+        <option value="중국 웹소설 번역체">중국 웹소설 번역체</option>
+        <option value="직접적이고 빠른 전개">직접적이고 빠른 전개</option>
+      </select>
+    </div>
+
+    <!-- 등장인물 -->
+    <div class="sidebar-section">
+      <div class="section-title">등장인물</div>
+      <div class="characters-list" id="charList"></div>
+
+      <div class="char-add-row" style="margin-top:12px">
+        <input type="text" id="charName" placeholder="이름">
+        <input type="text" id="charRole" placeholder="역할" style="max-width:90px">
+      </div>
+      <textarea id="charDesc" placeholder="외모, 성격, 배경 등..." style="margin-top:6px;min-height:60px"></textarea>
+      <button class="btn-sm" onclick="addCharacter()" style="margin-top:8px;width:100%">+ 인물 추가</button>
+    </div>
+
+    <!-- 추가 지시 -->
+    <div class="sidebar-section">
+      <div class="section-title">추가 지시사항</div>
+      <textarea id="extraInstructions" placeholder="AI에게 추가로 전달할 지시사항 (예: 1인칭 시점, 특정 금기사항 등)..." style="min-height:80px"></textarea>
+    </div>
+
+  </div>
+
+  <!-- ── 콘텐츠 ── -->
+  <div class="content">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('generate')">✍️ 화 생성</button>
+      <button class="tab-btn" onclick="switchTab('result')">📖 결과 보기</button>
+      <button class="tab-btn" onclick="switchTab('history')">📚 히스토리</button>
+      <button class="tab-btn" onclick="switchTab('preset')">💾 설정 저장</button>
+    </div>
+
+    <!-- 생성 탭 -->
+    <div class="panel active" id="panel-generate">
+      <div class="generate-panel">
+
+        <div class="episode-controls">
+          <div class="episode-num">화 번호</div>
+          <input type="number" id="episodeNum" value="1" min="1" style="width:80px">
+          <button class="btn-sm" onclick="prevEp()">◀ 이전</button>
+          <button class="btn-sm" onclick="nextEp()">다음 ▶</button>
+        </div>
+
+        <div class="plot-input">
+          <div class="section-title" style="margin-bottom:8px">이번 화 줄거리 / 방향</div>
+          <textarea id="episodePlot" placeholder="이번 화에서 일어날 사건, 감정선, 장면을 간략히 적어주세요.&#10;예: 주인공이 처음으로 히로인과 단둘이 남겨지는 상황에서..."></textarea>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div>
+              <label style="margin-top:0">이전 화 이어쓰기</label>
+              <select id="continueMode">
+                <option value="no">새로 시작</option>
+                <option value="yes">이전 화 이어서</option>
+              </select>
+            </div>
+            <div>
+              <label style="margin-top:0">성인 묘사 강도</label>
+              <select id="adultLevel">
+                <option value="암시적">암시적 (은근하게)</option>
+                <option value="중간">중간 (명확하게)</option>
+                <option value="강함" selected>강함 (직접적으로)</option>
+                <option value="없음">없음</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-generate" id="btnGenerate" onclick="generateEpisode()">▶ 이 화 생성하기</button>
+
+        <div class="statusbar" style="border-top:none;padding:0;background:none">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusMsg">설정을 입력하고 생성을 시작하세요</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 결과 탭 -->
+    <div class="panel" id="panel-result">
+      <div class="result-panel">
+        <div class="result-toolbar">
+          <div class="episode-badge" id="resultBadge">—</div>
+          <button class="btn-ghost" onclick="downloadEpisode()">TXT 저장</button>
+          <button class="btn-ghost" onclick="copyEpisode()">복사</button>
+          <button class="btn-ghost" onclick="downloadAll()">전체 저장</button>
+        </div>
+        <div class="result-text empty" id="resultText">생성된 내용이 없습니다</div>
+      </div>
+    </div>
+
+    <!-- 히스토리 탭 -->
+    <div class="panel" id="panel-history">
+      <div class="history-panel" id="historyList">
+        <div class="history-empty">아직 생성된 화가 없습니다</div>
+      </div>
+    </div>
+
+    <!-- 설정 저장 탭 -->
+    <div class="panel" id="panel-preset">
+      <div class="generate-panel">
+        <div class="section-title">설정 슬롯 (최대 5개)</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:8px">현재 설정을 슬롯에 저장하거나, 슬롯을 불러와 바로 집필할 수 있어요.</div>
+        <div id="presetSlots" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ── STATE ─────────────────────────────────────────────────────────────────
+let characters = [];
+let history = [];
+let currentResult = '';
+let currentEp = 1;
+
+// ── TABS ──────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', ['generate','result','history','preset'][i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'history') renderHistory();
+  if (tab === 'preset') renderPresets();
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────
+function setStatus(msg, state='idle') {
+  document.getElementById('statusMsg').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state !== 'idle' ? ' ' + state : '');
+}
+
+// ── 참고 파일 (여러 개) ───────────────────────────────────────────────────
+let refFiles = []; // [{name, text}]
+
+document.getElementById('refFileInput').addEventListener('change', function() {
+  const files = [...this.files];
+  if (!files.length) return;
+
+  let loaded = 0;
+  files.forEach(file => {
+    // 이미 추가된 파일은 스킵
+    if (refFiles.find(r => r.name === file.name)) { loaded++; checkDone(); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      refFiles.push({ name: file.name, text: e.target.result });
+      loaded++;
+      checkDone();
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+
+  function checkDone() {
+    if (loaded === files.length) {
+      renderRefList();
+      setStatus(`참고 소설 ${refFiles.length}개 로드 완료`, 'done');
+    }
+  }
+
+  // input 초기화 (같은 파일 재선택 가능하게)
+  this.value = '';
+});
+
+function removeRef(name) {
+  refFiles = refFiles.filter(r => r.name !== name);
+  renderRefList();
+  setStatus(refFiles.length > 0 ? `참고 소설 ${refFiles.length}개` : '참고 소설 없음');
+}
+
+function renderRefList() {
+  const el = document.getElementById('refList');
+  if (refFiles.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = refFiles.map(r => `
+    <div class="ref-item">
+      <div class="ref-item-name">✅ ${r.name}</div>
+      <div class="ref-item-size">${Math.round(r.text.length/100)/10}KB</div>
+      <button class="ref-item-del" onclick="removeRef('${r.name.replace(/'/g,"\\'")}')">×</button>
+    </div>
+  `).join('');
+}
+
+// ── 인물 관리 ─────────────────────────────────────────────────────────────
+function addCharacter() {
+  const name = document.getElementById('charName').value.trim();
+  const role = document.getElementById('charRole').value.trim();
+  const desc = document.getElementById('charDesc').value.trim();
+  if (!name) { alert('이름을 입력해주세요'); return; }
+  characters.push({ name, role, desc });
+  document.getElementById('charName').value = '';
+  document.getElementById('charRole').value = '';
+  document.getElementById('charDesc').value = '';
+  renderChars();
+}
+
+function removeChar(i) {
+  characters.splice(i, 1);
+  renderChars();
+}
+
+function renderChars() {
+  const el = document.getElementById('charList');
+  if (characters.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:12px;font-family:DM Mono,monospace">등장인물 없음</div>';
+    return;
+  }
+  el.innerHTML = characters.map((c, i) => `
+    <div class="char-card" id="char-card-${i}">
+      <div style="flex:1;min-width:0">
+        <div class="char-name">${c.name}</div>
+        <div class="char-role">${c.role || '역할 미지정'}</div>
+        ${c.desc ? `<div class="char-desc-preview">${c.desc.substring(0,40)}${c.desc.length>40?'...':''}</div>` : ''}
+      </div>
+      <div class="char-btns">
+        <button class="char-edit" onclick="toggleEditChar(${i})">✏️ 수정</button>
+        <button class="char-del" onclick="removeChar(${i})">× 삭제</button>
+      </div>
+    </div>
+    <div class="char-edit-form" id="char-edit-${i}" style="display:none">
+      <input type="text" id="edit-name-${i}" value="${c.name}" placeholder="이름">
+      <input type="text" id="edit-role-${i}" value="${c.role}" placeholder="역할">
+      <textarea id="edit-desc-${i}" placeholder="상세 설명 (나이, 키, 성격 등)">${c.desc}</textarea>
+      <div class="char-edit-btns">
+        <button class="btn-sm" onclick="saveEditChar(${i})" style="background:var(--accent)">저장</button>
+        <button class="btn-sm" onclick="toggleEditChar(${i})">취소</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleEditChar(i) {
+  const form = document.getElementById(`char-edit-${i}`);
+  form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  form.style.flexDirection = 'column';
+}
+
+function saveEditChar(i) {
+  characters[i].name = document.getElementById(`edit-name-${i}`).value.trim() || characters[i].name;
+  characters[i].role = document.getElementById(`edit-role-${i}`).value.trim();
+  characters[i].desc = document.getElementById(`edit-desc-${i}`).value.trim();
+  renderChars();
+  setStatus(`"${characters[i].name}" 수정 완료`, 'done');
+}
+
+renderChars();
+
+// ── 화 번호 ──────────────────────────────────────────────────────────────
+function prevEp() {
+  const n = document.getElementById('episodeNum');
+  if (parseInt(n.value) > 1) n.value = parseInt(n.value) - 1;
+}
+function nextEp() {
+  const n = document.getElementById('episodeNum');
+  n.value = parseInt(n.value) + 1;
+}
+
+// ── 시스템 프롬프트 빌더 ──────────────────────────────────────────────────
+
+// 소설 텍스트에서 앞/중/뒤 균등하게 샘플 추출
+function extractStyleSample(text, totalLimit) {
+  if (text.length <= totalLimit) return text;
+  const partSize = Math.floor(totalLimit / 3);
+  const head = text.slice(0, partSize);
+  const midStart = Math.floor(text.length / 2) - Math.floor(partSize / 2);
+  const mid = text.slice(midStart, midStart + partSize);
+  const tail = text.slice(-partSize);
+  return head + '\n\n[...중략...]\n\n' + mid + '\n\n[...중략...]\n\n' + tail;
+}
+
+function buildSystemPrompt() {
+  const title = document.getElementById('novelTitle').value.trim() || '제목 없음';
+  const theme = document.getElementById('novelTheme').value.trim();
+
+  // 주제 체크박스
+  const checkedThemes = [...document.querySelectorAll('#themeGrid input:checked')].map(i => i.value);
+  const themeStr = [
+    ...(checkedThemes.length > 0 ? checkedThemes : []),
+    ...(theme ? [theme] : [])
+  ].join(', ') || '자유';
+  const minLines = document.getElementById('minLines').value;
+  const style = document.getElementById('styleType').value;
+  const extra = document.getElementById('extraInstructions').value.trim();
+  const adultLevel = document.getElementById('adultLevel').value;
+
+  // 장르 체크박스
+  const checkedGenres = [...document.querySelectorAll('#genreGrid input:checked')].map(i => i.value);
+  const genre = checkedGenres.length > 0 ? checkedGenres.join(', ') : '성인 소설';
+
+  // ── 문체 참고 섹션 (프롬프트 최상단에 배치, 분석 지시 포함) ──
+  let refSection = '';
+  if (refFiles.length > 0) {
+    // 파일 수에 따라 글자 한도 조정 (총량 유지)
+    const totalCharBudget = 24000;
+    const charLimit = Math.floor(totalCharBudget / refFiles.length);
+
+    const samplesBlock = refFiles.map((r, i) => {
+      const sample = extractStyleSample(r.text, charLimit);
+      return `### 참고 소설 ${i+1}: 『${r.name}』\n\`\`\`\n${sample}\n\`\`\``;
+    }).join('\n\n');
+
+    refSection = `
+## 🎯 [최우선 지시] 아래 참고 소설의 문체를 반드시 모방하라
+
+당신의 임무는 아래 참고 소설들의 **문체를 철저히 분석하고 그대로 흉내내어** 새 소설을 쓰는 것이다.
+참고 소설의 인물·줄거리는 절대 가져오지 않고, **오직 글쓰기 방식만** 복제한다.
+
+분석하고 따라야 할 문체 요소:
+1. **문장 길이와 리듬** — 짧고 끊어치는 문체인가, 긴 만연체인가
+2. **서술 시점** — 1인칭인가 3인칭인가, 내적 독백의 빈도
+3. **감각 묘사 방식** — 시각/청각/촉각을 어떻게 표현하는가
+4. **대화 처리** — 대화 앞뒤 지문 스타일, 대화체 어투
+5. **감정 표현** — 직접 감정을 쓰는가, 행동으로 간접 표현하는가
+6. **문단 구성** — 문단 길이, 줄바꿈 빈도, 여백 활용
+7. **단어 선택** — 한자어 비율, 구어체 vs 문어체, 특유의 표현
+
+이 참고 소설들을 읽었을 때의 **느낌과 리듬 그대로** 새 소설을 써라.
+
+${samplesBlock}
+
+---
+`;
+  }
+
+  let adultInstruction = '';
+  if (adultLevel !== '없음') {
+    adultInstruction = `
+## 성인 묘사 지침
+- 성인 장면은 "${adultLevel}" 강도로 묘사한다.
+- 성인 묘사를 축약하거나 생략하지 않는다. 원하는 장면이 나오면 충분히 길고 구체적으로 묘사한다.
+- 신체 묘사, 감각 묘사, 심리 묘사를 모두 포함한다.`;
+  }
+
+  const charBlock = characters.length > 0
+    ? characters.map((c, i) =>
+        `[인물${i+1}] 이름: ${c.name} / 역할: ${c.role || '미지정'} / 상세: ${c.desc || '없음'}`
+      ).join('\n')
+    : '등장인물 설정 없음 — 자유롭게 창작';
+
+  return `당신은 한국 성인 소설 전문 작가입니다.
+${refSection}
+## 등장인물 (반드시 이 설정을 따른다)
+${charBlock}
+
+## 소설 기본 정보
+- 제목: ${title}
+- 장르: 성인 ${genre}
+- 기본 문체: ${style}${refFiles.length > 0 ? ' (단, 위 참고 소설 문체가 우선)' : ''}
+- 주제/설정: ${themeStr}
+
+## 추가 지시사항${extra ? `\n${extra}` : '\n없음'}
+${adultInstruction}
+
+## 작성 규칙
+- 반드시 ${minLines}줄 이상 작성한다. 문장이 중간에 끊기면 절대 안 된다.
+- 분량이 부족하면 묘사, 심리, 대화를 추가해서 ${minLines}줄을 넘겨라.
+- 대화, 묘사, 심리 묘사를 균형 있게 배치한다.
+- 챕터 제목이나 화 번호를 본문에 넣지 않는다.
+- 소설 본문만 출력한다. 설명이나 메모 금지.
+
+## 최종 확인
+- 주인공 이름이 "${characters[0]?.name || '설정된 주인공'}"인가?
+- 참고 소설의 문체 리듬이 느껴지는가?
+- 문장이 완전히 마무리되는가?
+- ${minLines}줄 이상인가?`;
+}
+
+// ── 생성 ──────────────────────────────────────────────────────────────────
+async function generateEpisode() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { setStatus('API 키를 입력해주세요', 'error'); return; }
+
+  const ep = parseInt(document.getElementById('episodeNum').value);
+  const plot = document.getElementById('episodePlot').value.trim();
+  const continueMode = document.getElementById('continueMode').value;
+
+  if (!plot) { setStatus('이번 화 줄거리를 입력해주세요', 'error'); return; }
+
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+  setStatus(`제${ep}화 생성 중...`, 'working');
+
+  // 이전 화 내용 — 화 번호 기준으로 정확하게 가져오기
+  let prevContent = '';
+  if (continueMode === 'yes') {
+    const prevEpisode = history.find(h => h.ep === ep - 1);
+    if (prevEpisode) {
+      // 이전 화 앞부분 + 뒷부분 모두 전달해서 맥락 확보
+      const text = prevEpisode.content;
+      const head = text.slice(0, 1500);
+      const tail = text.slice(-1500);
+      const mid = text.length > 3000 ? '\n...(중략)...\n' : '';
+      prevContent = `\n\n## 이전 화(제${ep-1}화) 내용 — 반드시 이 내용과 자연스럽게 이어서 작성하라\n${head}${mid}${tail}`;
+    } else {
+      // 이전 화가 없으면 가장 최근 화로 대체
+      const sorted = [...history].sort((a,b) => b.ep - a.ep);
+      if (sorted.length > 0) {
+        const last = sorted[0];
+        const text = last.content;
+        const tail = text.slice(-2000);
+        prevContent = `\n\n## 직전 화(제${last.ep}화) 내용 — 반드시 이 내용과 자연스럽게 이어서 작성하라\n${tail}`;
+      }
+    }
+  }
+
+  const charReminder = characters.length > 0
+    ? `\n\n등장인물 재확인: ${characters.map(c => `${c.name}(${c.role || '역할미지정'})`).join(', ')} — 이 인물들을 반드시 등장시켜라.`
+    : '';
+
+  const userMsg = `제${ep}화를 작성해주세요.\n\n이번 화 방향: ${plot}${charReminder}${prevContent}`;
+
+  try {
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        max_tokens: 8000,
+        messages: [
+          { role: 'system', content: buildSystemPrompt() },
+          { role: 'user', content: userMsg }
+        ]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API 오류 (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    currentResult = content;
+    currentEp = ep;
+
+    // 히스토리 저장
+    const existing = history.findIndex(h => h.ep === ep);
+    const title = document.getElementById('novelTitle').value.trim() || '소설';
+    if (existing >= 0) history[existing] = { ep, title, content };
+    else history.push({ ep, title, content });
+
+    // 결과 표시
+    const resultEl = document.getElementById('resultText');
+    resultEl.classList.remove('empty');
+    resultEl.textContent = content;
+    document.getElementById('resultBadge').textContent = `제${ep}화`;
+
+    // 결과 탭으로 이동
+    switchTab('result');
+    setStatus(`제${ep}화 생성 완료 — ${content.length.toLocaleString()}자`, 'done');
+
+    // 다음 화로 자동 이동
+    document.getElementById('episodeNum').value = ep + 1;
+    document.getElementById('episodePlot').value = '';
+
+  } catch(e) {
+    setStatus('오류: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ 이 화 생성하기';
+  }
+}
+
+// ── 다운로드 / 복사 ──────────────────────────────────────────────────────
+function downloadEpisode() {
+  if (!currentResult) return;
+  const title = document.getElementById('novelTitle').value.trim() || '소설';
+  const blob = new Blob([currentResult], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title}_제${currentEp}화.txt`;
+  a.click();
+}
+
+function copyEpisode() {
+  if (!currentResult) return;
+  navigator.clipboard.writeText(currentResult).then(() => {
+    setStatus('클립보드에 복사됨', 'done');
+  });
+}
+
+function downloadAll() {
+  if (history.length === 0) { setStatus('저장할 내용이 없습니다', 'error'); return; }
+  const title = document.getElementById('novelTitle').value.trim() || '소설';
+  const all = history
+    .sort((a, b) => a.ep - b.ep)
+    .map(h => `\n\n\n===== 제${h.ep}화 =====\n\n${h.content}`)
+    .join('');
+  const blob = new Blob([title + all], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title}_전체.txt`;
+  a.click();
+}
+
+// ── 설정 저장/불러오기 ────────────────────────────────────────────────────
+const PRESET_KEY = 'novel_presets';
+let presets = JSON.parse(localStorage.getItem(PRESET_KEY) || 'null') || Array(5).fill(null);
+
+function gatherSettings() {
+  return {
+    name: document.getElementById('novelTitle').value.trim() || '설정 ' + new Date().toLocaleDateString('ko'),
+    novelTitle: document.getElementById('novelTitle').value,
+    novelTheme: document.getElementById('novelTheme').value,
+    novelGenres: [...document.querySelectorAll('#genreGrid input:checked')].map(i => i.value),
+    novelThemes: [...document.querySelectorAll('#themeGrid input:checked')].map(i => i.value),
+    minLines: document.getElementById('minLines').value,
+    styleType: document.getElementById('styleType').value,
+    extraInstructions: document.getElementById('extraInstructions').value,
+    adultLevel: document.getElementById('adultLevel').value,
+    characters: JSON.parse(JSON.stringify(characters)),
+    savedAt: new Date().toLocaleString('ko')
+  };
+}
+
+function applySettings(s) {
+  document.getElementById('novelTitle').value = s.novelTitle || '';
+  document.getElementById('novelTheme').value = s.novelTheme || '';
+  document.getElementById('minLines').value = s.minLines || 100;
+  document.getElementById('styleType').value = s.styleType || '한국 웹소설체';
+  document.getElementById('extraInstructions').value = s.extraInstructions || '';
+  document.getElementById('adultLevel').value = s.adultLevel || '강함';
+
+  // 장르 체크박스
+  document.querySelectorAll('#genreGrid input').forEach(cb => {
+    cb.checked = (s.novelGenres || []).includes(cb.value);
+  });
+  // 주제 체크박스
+  document.querySelectorAll('#themeGrid input').forEach(cb => {
+    cb.checked = (s.novelThemes || []).includes(cb.value);
+  });
+  // 등장인물
+  characters = s.characters || [];
+  renderChars();
+}
+
+function savePreset(idx) {
+  const nameInput = document.getElementById(`preset-name-${idx}`);
+  const customName = nameInput ? nameInput.value.trim() : '';
+  const settings = gatherSettings();
+  if (customName) settings.name = customName;
+  presets[idx] = settings;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1}에 저장 완료`, 'done');
+}
+
+function loadPreset(idx) {
+  const s = presets[idx];
+  if (!s) return;
+  applySettings(s);
+  switchTab('generate');
+  setStatus(`슬롯 ${idx+1} "${s.name}" 불러옴`, 'done');
+}
+
+function deletePreset(idx) {
+  presets[idx] = null;
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+  renderPresets();
+  setStatus(`슬롯 ${idx+1} 삭제됨`);
+}
+
+function renderPresets() {
+  const el = document.getElementById('presetSlots');
+  el.innerHTML = presets.map((p, i) => {
+    if (!p) return `
+      <div class="preset-slot" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-empty">비어 있음</div>
+        </div>
+        <input class="preset-name-input visible" id="preset-name-${i}" type="text" placeholder="설정 이름 입력...">
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="savePreset(${i})">💾 현재 설정 저장</button>
+        </div>
+      </div>`;
+
+    const genres = (p.novelGenres||[]).join(', ') || '—';
+    const themes = (p.novelThemes||[]).join(', ') || '—';
+    const chars = (p.characters||[]).map(c=>c.name).join(', ') || '—';
+    return `
+      <div class="preset-slot filled" id="slot-${i}">
+        <div class="preset-slot-header">
+          <div class="preset-slot-num">슬롯 ${i+1}</div>
+          <div class="preset-slot-name">${p.name}</div>
+        </div>
+        <div class="preset-slot-meta">
+          장르: ${genres}<br>
+          주제: ${themes}<br>
+          인물: ${chars}<br>
+          저장: ${p.savedAt}
+        </div>
+        <div class="preset-slot-btns">
+          <button class="btn-sm" onclick="loadPreset(${i})" style="background:var(--accent)">▶ 불러와서 집필</button>
+          <button class="btn-sm" onclick="savePreset(${i})">🔄 덮어쓰기</button>
+          <button class="btn-sm" onclick="deletePreset(${i})" style="background:var(--accent-dim)">🗑 삭제</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+renderPresets();
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (history.length === 0) {
+    el.innerHTML = '<div class="history-empty">아직 생성된 화가 없습니다</div>';
+    return;
+  }
+  el.innerHTML = history
+    .sort((a, b) => a.ep - b.ep)
+    .map(h => `
+      <div class="history-item" onclick="loadHistory(${h.ep})">
+        <div class="history-ep">제${h.ep}화 · ${h.title}</div>
+        <div class="history-preview">${h.content.substring(0, 120)}...</div>
+      </div>
+    `).join('');
+}
+
+function loadHistory(ep) {
+  const h = history.find(x => x.ep === ep);
+  if (!h) return;
+  currentResult = h.content;
+  currentEp = h.ep;
+  const resultEl = document.getElementById('resultText');
+  resultEl.classList.remove('empty');
+  resultEl.textContent = h.content;
+  document.getElementById('resultBadge').textContent = `제${h.ep}화`;
+  switchTab('result');
+}
+</script>
+</body>
+</html>
