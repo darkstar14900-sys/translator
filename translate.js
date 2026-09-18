@@ -26,7 +26,12 @@ const DEFAULT_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아�
 const INPUT_FILE = process.env.INPUT_FILE;
 const MODEL = process.env.MODEL || 'deepseek/deepseek-chat';
 const API_KEY = process.env.OPENROUTER_API_KEY;
+const GH_TOKEN = process.env.GITHUB_TOKEN;
+const GH_REPO = process.env.GITHUB_REPOSITORY; // "owner/repo" 형태, Actions가 자동으로 제공
+const GH_REF = process.env.GITHUB_REF_NAME || 'main';
 const COMMIT_EVERY = 10; // 이 청크 개수마다 중간 저장 커밋 (타임아웃/중단 대비)
+const START_TIME = Date.now();
+const MAX_RUNTIME_MS = (5 * 60 + 40) * 60 * 1000; // 5시간 40분 - GitHub의 6시간 강제종료 전에 스스로 멈추기 위한 여유시간
 
 if (!INPUT_FILE) { console.error('INPUT_FILE 환경변수가 없습니다.'); process.exit(1); }
 if (!API_KEY) { console.error('OPENROUTER_API_KEY 시크릿이 설정되지 않았습니다.'); process.exit(1); }
@@ -91,6 +96,33 @@ async function callAPI(text) {
   return data.choices?.[0]?.message?.content || '';
 }
 
+// 시간 제한에 걸려 못 끝냈을 때, GitHub한테 "다음 번역 실행을 자동으로 시작해줘" 라고 요청
+async function triggerSelfRestart() {
+  if (!GH_TOKEN || !GH_REPO) {
+    console.error('자동 재시작 실패: GITHUB_TOKEN 또는 저장소 정보(GITHUB_REPOSITORY)가 없습니다. 수동으로 Run workflow를 다시 눌러주세요.');
+    return;
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/translate.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + GH_TOKEN,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ ref: GH_REF, inputs: { input_file: INPUT_FILE, model: MODEL } })
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      console.error('다음 실행 자동 예약 실패:', res.status, t, '-> 수동으로 Run workflow를 다시 눌러주세요.');
+    } else {
+      console.log('✅ 다음 번역 실행이 자동으로 예약되었습니다. 잠시 후 저절로 이어서 시작됩니다.');
+    }
+  } catch (err) {
+    console.error('다음 실행 자동 예약 중 오류:', err.message, '-> 수동으로 Run workflow를 다시 눌러주세요.');
+  }
+}
+
 function commitProgress(message) {
   try {
     execSync('git add output/', { stdio: 'inherit' });
@@ -133,7 +165,14 @@ async function main() {
     } catch (e) { console.error('진행상황 파일 파싱 실패, 처음부터 시작합니다.'); }
   }
 
+  let timeUp = false;
+
   for (let i = cursor; i < total; i++) {
+    if (Date.now() - START_TIME > MAX_RUNTIME_MS) {
+      timeUp = true;
+      console.log(`시간 제한(5시간40분) 도달. 지금까지 ${cursor}/${total} 완료. 안전하게 저장하고 다음 회차를 예약합니다.`);
+      break;
+    }
     let translated = null;
     for (let retry = 0; retry < 5; retry++) {
       try {
@@ -161,6 +200,13 @@ async function main() {
     if (cursor % COMMIT_EVERY === 0) {
       commitProgress(`중간 저장 ${cursor}/${total}: ${baseName}`);
     }
+  }
+
+  if (timeUp) {
+    // 마지막 상태를 확실히 커밋하고, 다음 실행을 자동으로 예약한 뒤 정상 종료 (에러 아님)
+    commitProgress(`시간 제한으로 일시중단, 자동 이어서 예약 ${cursor}/${total}: ${baseName}`);
+    await triggerSelfRestart();
+    return;
   }
 
   const finalText = results.join('\n\n');
