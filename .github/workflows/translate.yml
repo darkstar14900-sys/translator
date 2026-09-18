@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   translate:
@@ -33,4 +34,5 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           INPUT_FILE: ${{ github.event.inputs.input_file }}
           MODEL: ${{ github.event.inputs.model }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node translate.js
