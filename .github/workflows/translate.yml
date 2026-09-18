@@ -1,0 +1,36 @@
+# 이 파일은 저장소의 .github/workflows/translate.yml 경로에 넣어야 합니다.
+name: 소설 번역
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_file:
+        description: '번역할 원문 파일 경로 (예: queue/input-1234567890.txt)'
+        required: true
+      model:
+        description: 'OpenRouter 모델 ID'
+        required: false
+        default: 'deepseek/deepseek-chat'
+
+permissions:
+  contents: write
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설치
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 번역 실행
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          INPUT_FILE: ${{ github.event.inputs.input_file }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: node translate.js
