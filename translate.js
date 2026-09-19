@@ -49,8 +49,8 @@ const progressPath = path.join(outDir, `${baseName}.progress.json`);
 const finalPath = path.join(outDir, `${baseName}_번역본.txt`);
 const partialPath = path.join(outDir, `${baseName}_진행중.txt`);
 
-// translator-1-1.html 의 chunkText()와 동일한 로직
-function chunkText(text, max = 500) {
+// translator-1-1.html 의 chunkText()와 동일한 로직 (청크를 키워서 API 호출 횟수 = 반복되는 프롬프트 비용을 줄임)
+function chunkText(text, max = 1500) {
   const paras = text.split('\n');
   const out = [];
   let cur = '';
