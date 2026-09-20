@@ -24,7 +24,7 @@ const DEFAULT_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아�
 - 번역문만 출력한다. 주석·설명 불필요. 원문 포함 금지.`;
 
 const INPUT_FILE = process.env.INPUT_FILE;
-const MODEL = process.env.MODEL || 'deepseek/deepseek-chat';
+const MODEL = process.env.MODEL || 'deepseek/deepseek-v4-flash';
 const API_KEY = process.env.OPENROUTER_API_KEY;
 const GH_TOKEN = process.env.GITHUB_TOKEN;
 const GH_REPO = process.env.GITHUB_REPOSITORY; // "owner/repo" 형태, Actions가 자동으로 제공
