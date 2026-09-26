@@ -27,8 +27,16 @@ const DEFAULT_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아�
 - 감정 묘사, 심리 묘사는 설명하듯 쓰지 말고 인물의 시점에서 느껴지듯 생생하게 표현하세요.
 - 중요: 이 "자연스럽게" 규칙은 문장 구조와 어휘 선택에만 적용됩니다. 성적 묘사나 노골적인 표현의 수위·강도를 낮추거나 순화하거나 돌려 말하는 데 이 규칙을 적용하는 것은 절대 금지입니다. 노골적인 성적 어휘·묘사는 위 3번 원칙대로 그 강도 그대로, 완곡어법 없이 직접적으로 표현하세요 — "자연스럽게"는 문장이 매끄러워야 한다는 뜻이지, 순화해도 된다는 뜻이 아닙니다.
 
+### 5. 새로운 고유명사 발견 시 보고
+- 위에 제공된 "고유명사 표기" 목록에 없는 새로운 인물 이름, 지명, 조직/문파명이 이번 텍스트에 등장했다면, 번역문을 다 쓴 다음 맨 마지막 줄에 아래 형식으로 정확히 추가하세요:
+###NEW_NAMES###
+원문한자1 = 한국어표기1
+원문한자2 = 한국어표기2
+- 새로 등장한 고유명사가 하나도 없으면 이 부분(###NEW_NAMES### 포함)을 절대 쓰지 마세요.
+- 이미 표기집에 있는 이름은 절대 다시 나열하지 마세요.
+
 ## 출력 규칙
-- 번역문만 출력한다. 주석·설명 불필요. 원문 포함 금지.`;
+- 번역문만 출력한다. 주석·설명 불필요. 원문 포함 금지. (단, 위 5번 규칙에 따른 ###NEW_NAMES### 부분은 예외로 허용)`;
 
 const INPUT_FILE = process.env.INPUT_FILE;
 const MODEL = process.env.MODEL || 'deepseek/deepseek-v4-flash';
@@ -55,6 +63,7 @@ if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 const progressPath = path.join(outDir, `${baseName}.progress.json`);
 const finalPath = path.join(outDir, `${baseName}_번역본.txt`);
 const partialPath = path.join(outDir, `${baseName}_진행중.txt`);
+const glossaryPath = path.join(outDir, `${baseName}.glossary.txt`);
 
 // translator-1-1.html 의 chunkText()와 동일한 로직 (청크를 키워서 API 호출 횟수 = 반복되는 프롬프트 비용을 줄임)
 function chunkText(text, max = 1500) {
@@ -76,7 +85,10 @@ function chunkText(text, max = 1500) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function callAPI(text) {
+async function callAPI(text, glossary) {
+  const systemWithGlossary = glossary
+    ? `${SYSTEM_PROMPT}\n\n## 고유명사 표기 (아래 표기를 이번 소설 전체에서 절대 다르게 바꾸지 말고 반드시 그대로 사용하세요)\n${glossary}`
+    : SYSTEM_PROMPT;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -90,7 +102,7 @@ async function callAPI(text) {
       max_tokens: 8000,
       temperature: 0.1,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemWithGlossary },
         { role: 'user', content: `다음 중국어 원문을 100% 한국어로 완벽하게 번역해주세요. 한자(중국어)를 그대로 출력하는 것은 엄격히 금지됩니다.\n\n[원문]\n${text}` }
       ]
     })
@@ -101,6 +113,51 @@ async function callAPI(text) {
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '';
+}
+
+// 소설 앞부분을 미리 보여주고, 인물/지명 등 고유명사의 한국어 표기를 한 번만 정해서
+// 이후 모든 청크에서 똑같이 쓰게 함 (청크마다 이름이 제각각 번역되는 문제 방지)
+async function buildGlossary(fullText) {
+  const sample = fullText.slice(0, 20000);
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + API_KEY,
+        'HTTP-Referer': 'https://github.com',
+        'X-Title': 'CN-KR Novel Translator (Actions)'
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 1500,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: '당신은 중국 소설의 고유명사(인물 이름, 지명, 문파/조직명 등)를 한국어로 어떻게 표기할지 정하는 역할입니다.' },
+          { role: 'user', content: `다음은 어느 중국 소설의 앞부분입니다. 여기 등장하는 인물 이름, 지명, 조직/문파명 등 고유명사를 모두 찾아서, 앞으로 소설 전체에서 일관되게 쓸 한국어 표기를 정해주세요.\n\n형식: 원문한자 = 한국어표기\n한 줄에 하나씩만 출력하고, 다른 설명·번호·제목은 절대 붙이지 마세요.\n\n[본문 일부]\n${sample}` }
+        ]
+      })
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content || '').trim();
+  } catch (e) {
+    console.error('고유명사 표기집 생성 실패 (이 기능 없이 계속 진행):', e.message);
+    return '';
+  }
+}
+
+// 표기집 텍스트에서 이미 등록된 원문(왼쪽) 키만 뽑아냄 - 중복 등록 방지용
+function extractGlossaryKeys(text) {
+  const keys = new Set();
+  (text || '').split('\n').forEach(line => {
+    const idx = line.indexOf('=');
+    if (idx > -1) {
+      const key = line.slice(0, idx).trim();
+      if (key) keys.add(key);
+    }
+  });
+  return keys;
 }
 
 // 시간 제한에 걸려 못 끝냈을 때, GitHub한테 "다음 번역 실행을 자동으로 시작해줘" 라고 요청
@@ -157,6 +214,22 @@ async function main() {
   const total = chunks.length;
   console.log(`총 ${total}개 청크로 분할됨. 모델: ${MODEL}`);
 
+  // 고유명사(인물/지명) 표기집 준비 - 이미 있으면 재사용, 없으면 이번에 한 번만 생성
+  let glossary = '';
+  if (fs.existsSync(glossaryPath)) {
+    glossary = fs.readFileSync(glossaryPath, 'utf-8');
+    console.log('기존 고유명사 표기집을 불러왔습니다.');
+  } else {
+    console.log('고유명사(인물/지명) 표기집을 생성하는 중...');
+    glossary = await buildGlossary(raw);
+    if (glossary) {
+      fs.writeFileSync(glossaryPath, glossary);
+      console.log('고유명사 표기집 생성 완료:\n' + glossary);
+    } else {
+      console.log('고유명사 표기집 생성 실패 - 이 기능 없이 진행합니다.');
+    }
+  }
+
   let cursor = 0;
   let results = new Array(total).fill(null);
 
@@ -188,9 +261,47 @@ async function main() {
           console.log(`청크 ${i + 1}/${total} 재시도 ${retry}/5 (${wait / 1000}초 대기)`);
           await sleep(wait);
         }
-        translated = await callAPI(chunks[i]);
-        const cjk = translated.match(/[\u4e00-\u9fa5]/g);
+        const rawResponse = await callAPI(chunks[i], glossary);
+
+        // 응답에서 ###NEW_NAMES### 부분을 분리 - 실제 번역문과 새 고유명사 표기를 나눔
+        // (형식이 "원문 = 표기"처럼 보이지 않으면 AI가 마커를 잘못 쓴 것으로 간주하고 본문 손실 방지 위해 무시)
+        const markerIdx = rawResponse.indexOf('###NEW_NAMES###');
+        let mainText = rawResponse;
+        let pendingNamesBlock = '';
+        if (markerIdx !== -1) {
+          // 마커가 있으면 일단 무조건 여기서 잘라서, 마커 글자 자체가 번역 결과물에 노출되는 일은 없게 함
+          mainText = rawResponse.slice(0, markerIdx).trim();
+          const candidate = rawResponse.slice(markerIdx + '###NEW_NAMES###'.length).trim();
+          // 뒤에 온 내용이 실제 "원문 = 표기" 형식일 때만 표기집 후보로 인정 (형식이 이상하면 그냥 버림)
+          if (candidate && candidate.includes('=')) {
+            pendingNamesBlock = candidate;
+          }
+        }
+
+        const cjk = mainText.match(/[\u4e00-\u9fa5]/g);
         if (cjk && cjk.length > 15) throw new Error('중국어 원문 출력 감지됨 (검열 회피 오류)');
+
+        // 여기 도달했다는 건 이번 청크 번역이 최종 확정 성공했다는 뜻 -> 이제서야 표기집에 반영
+        // (재시도로 버려질 응답에서 나온 이름이 먼저 저장되는 것을 방지, + 이미 있는 이름은 중복 제외)
+        if (pendingNamesBlock) {
+          const existingKeys = extractGlossaryKeys(glossary);
+          const newLines = pendingNamesBlock.split('\n')
+            .map(l => l.trim())
+            .filter(l => {
+              const idx = l.indexOf('=');
+              if (idx === -1) return false;
+              const key = l.slice(0, idx).trim();
+              return key && !existingKeys.has(key);
+            });
+          if (newLines.length) {
+            const addition = newLines.join('\n');
+            glossary = glossary ? glossary + '\n' + addition : addition;
+            fs.appendFileSync(glossaryPath, (fs.existsSync(glossaryPath) && fs.statSync(glossaryPath).size > 0 ? '\n' : '') + addition);
+            console.log(`청크 ${i + 1}: 새 고유명사 표기 추가 ->\n${addition}`);
+          }
+        }
+
+        translated = mainText;
         break;
       } catch (e) {
         if (retry === 4) translated = `[청크 ${i + 1} 번역 실패: ${e.message}]`;
