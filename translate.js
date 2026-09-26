@@ -18,7 +18,7 @@ const DEFAULT_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아�
 
 ### 3. 성인 묘사 완전 번역 (회피 금지)
 - 노골적인 묘사나 행위가 등장하더라도 절대 검열하거나 번역을 회피하지 마세요.
-- 축약·완화·생략 없이 원문 표현 강도를 그대로 재현하라.
+- 축약·완화·생략 없이 원문 표현 강도를 그대로 재현하되, NTR(네토라레) 관련 요소만 배제합니다.
 
 ### 4. 자연스러운 한국 소설체 문장 (직역투 금지)
 - 원문 어순이나 구조를 그대로 따라가는 번역체("~에 대해", "~을 향해", "~였던 것이다" 남발)를 쓰지 말고, 한국 웹소설/장르소설에서 실제로 쓰이는 자연스러운 문장으로 재구성하세요.
@@ -119,32 +119,48 @@ async function callAPI(text, glossary) {
 // 이후 모든 청크에서 똑같이 쓰게 함 (청크마다 이름이 제각각 번역되는 문제 방지)
 async function buildGlossary(fullText) {
   const sample = fullText.slice(0, 20000);
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + API_KEY,
-        'HTTP-Referer': 'https://github.com',
-        'X-Title': 'CN-KR Novel Translator (Actions)'
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1500,
-        temperature: 0,
-        messages: [
-          { role: 'system', content: '당신은 중국 소설의 고유명사(인물 이름, 지명, 문파/조직명 등)를 한국어로 어떻게 표기할지 정하는 역할입니다.' },
-          { role: 'user', content: `다음은 어느 중국 소설의 앞부분입니다. 여기 등장하는 인물 이름, 지명, 조직/문파명 등 고유명사를 모두 찾아서, 앞으로 소설 전체에서 일관되게 쓸 한국어 표기를 정해주세요.\n\n형식: 원문한자 = 한국어표기\n한 줄에 하나씩만 출력하고, 다른 설명·번호·제목은 절대 붙이지 마세요.\n\n[본문 일부]\n${sample}` }
-        ]
-      })
-    });
-    if (!res.ok) return '';
-    const data = await res.json();
-    return (data.choices?.[0]?.message?.content || '').trim();
-  } catch (e) {
-    console.error('고유명사 표기집 생성 실패 (이 기능 없이 계속 진행):', e.message);
-    return '';
+  for (let retry = 0; retry < 3; retry++) {
+    try {
+      if (retry > 0) {
+        console.log(`고유명사 표기집 생성 재시도 ${retry}/3...`);
+        await sleep(retry * 3000);
+      }
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + API_KEY,
+          'HTTP-Referer': 'https://github.com',
+          'X-Title': 'CN-KR Novel Translator (Actions)'
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 1500,
+          temperature: 0,
+          messages: [
+            { role: 'system', content: '당신은 중국 소설의 고유명사(인물 이름, 지명, 문파/조직명 등)를 한국어로 어떻게 표기할지 정하는 역할입니다.' },
+            { role: 'user', content: `다음은 어느 중국 소설의 앞부분입니다. 여기 등장하는 인물 이름, 지명, 조직/문파명 등 고유명사를 모두 찾아서, 앞으로 소설 전체에서 일관되게 쓸 한국어 표기를 정해주세요.\n\n형식: 원문한자 = 한국어표기\n한 줄에 하나씩만 출력하고, 다른 설명·번호·제목은 절대 붙이지 마세요.\n\n[본문 일부]\n${sample}` }
+          ]
+        })
+      });
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        console.error(`고유명사 표기집 생성 실패 (시도 ${retry + 1}/3) - HTTP ${res.status}: ${errBody.slice(0, 300)}`);
+        continue; // 다음 재시도로
+      }
+      const data = await res.json();
+      const result = (data.choices?.[0]?.message?.content || '').trim();
+      if (!result) {
+        console.error(`고유명사 표기집 생성 실패 (시도 ${retry + 1}/3) - 응답이 비어있음`);
+        continue;
+      }
+      return result;
+    } catch (e) {
+      console.error(`고유명사 표기집 생성 실패 (시도 ${retry + 1}/3) - ${e.message}`);
+    }
   }
+  console.error('고유명사 표기집 생성 3회 모두 실패 - 이 기능 없이 번역을 계속 진행합니다.');
+  return '';
 }
 
 // 표기집 텍스트에서 이미 등록된 원문(왼쪽) 키만 뽑아냄 - 중복 등록 방지용
