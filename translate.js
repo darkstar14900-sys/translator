@@ -203,6 +203,8 @@ async function triggerSelfRestart() {
   }
 }
 
+// 커밋 + 푸시. 동시에 여러 번역 작업(job)이 같은 브랜치에 push할 수 있으므로,
+// push 전에 반드시 원격 최신 내용을 rebase로 받아온 뒤 올린다. 실패하면 최대 5회 재시도.
 function commitProgress(message) {
   try {
     execSync('git add output/', { stdio: 'inherit' });
@@ -212,18 +214,39 @@ function commitProgress(message) {
   } catch (e) {
     // git diff --cached --quiet 가 실패(exit 1) = 변경사항 있음 -> 커밋 진행
   }
+
   try {
     execSync(`git commit -m "${message}"`, { stdio: 'inherit' });
-    execSync('git push', { stdio: 'inherit' });
-    console.log(`중간 저장 커밋 완료: ${message}`);
   } catch (err) {
-    console.error('커밋/푸시 실패 (번역은 계속 진행):', err.message);
+    console.error('커밋 실패 (번역은 계속 진행):', err.message);
+    return;
   }
+
+  for (let retry = 0; retry < 5; retry++) {
+    try {
+      if (retry > 0) {
+        const wait = 2 + retry * 2;
+        console.log(`push 재시도 준비 중... ${wait}초 대기`);
+        execSync(`sleep ${wait}`);
+      }
+      // 원격에 다른 job이 먼저 push한 커밋이 있으면 그 위에 내 커밋을 재배치(rebase)한 뒤 올림
+      execSync(`git pull --rebase origin ${GH_REF}`, { stdio: 'inherit' });
+      execSync('git push', { stdio: 'inherit' });
+      console.log(`중간 저장 커밋 완료: ${message}`);
+      return;
+    } catch (err) {
+      console.error(`커밋/푸시 실패 (재시도 ${retry + 1}/5):`, err.message);
+      // rebase가 충돌로 꼬였을 경우를 대비해 abort 시도 (실패해도 무시하고 다음 루프에서 재시도)
+      try { execSync('git rebase --abort', { stdio: 'ignore' }); } catch (e2) {}
+    }
+  }
+  console.error('최종 push 5회 모두 실패 - 이번 중간 저장은 원격에 반영되지 않았습니다 (번역은 계속 진행, 다음 저장 시점에 다시 시도됩니다)');
 }
 
 async function main() {
   execSync('git config user.name "translate-bot"');
   execSync('git config user.email "actions@github.com"');
+  execSync('git config pull.rebase true');
 
   const raw = fs.readFileSync(INPUT_FILE, 'utf-8');
   const chunks = chunkText(raw);
