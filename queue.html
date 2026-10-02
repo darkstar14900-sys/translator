@@ -38,6 +38,13 @@
   .slot{border-top:1px dashed var(--border);padding-top:12px;margin-top:12px;}
   .slot:first-child{border-top:none;padding-top:0;margin-top:0;}
   .slot-title{font-size:12px;color:var(--yellow);font-weight:700;margin-bottom:2px;}
+  .hint{font-size:10.5px;color:var(--text-muted);margin-top:3px;line-height:1.5;}
+  details{margin-top:10px;border:1px dashed var(--border-bright);border-radius:4px;padding:8px 10px;}
+  details summary{font-size:12px;color:var(--text-dim);cursor:pointer;}
+  .cfg-note{font-size:11px;color:var(--text-dim);margin:2px 0 6px;line-height:1.5;}
+  input[type=number]{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:9px 10px;font-size:13px;border-radius:4px;outline:none;}
+  textarea.prompt{min-height:90px;font-size:12px;}
 </style>
 </head>
 <body>
@@ -64,73 +71,15 @@
 </section>
 
 <section>
+  <h2>🎛 번역 설정 (모든 소설 공통)</h2>
+  <div class="cfg-note">비워두면 기존 기본값으로 번역해요. 값은 이 폰에 저장됩니다. 소설마다 다르게 하고 싶으면 아래 각 슬롯의 "이 소설만 다르게"를 쓰세요.</div>
+  <div id="common-cfg"></div>
+</section>
+
+<section>
   <h2>📄 번역할 원문 (최대 3개 동시 등록, 비워두면 건너뜁니다)</h2>
 
-  <div class="slot" data-slot="1">
-    <div class="slot-title">① 첫 번째 소설</div>
-    <label>중국어 원문 붙여넣기</label>
-    <textarea id="text-input-1" placeholder="여기에 붙여넣기..."></textarea>
-    <label class="upload-btn" for="file-input-1">또는 .txt 파일 선택</label>
-    <input type="file" id="file-input-1" accept=".txt" hidden>
-    <label>모델</label>
-    <select id="model-1">
-      <option value="deepseek/deepseek-v4-flash" selected>DeepSeek V4 Flash (가장 저렴, 기본값)</option>
-      <option value="deepseek/deepseek-v4.1-flash">DeepSeek V4.1 Flash (최신, 조금 더 비쌈)</option>
-      <option value="deepseek/deepseek-chat">DeepSeek V3 (deepseek-chat, 예전 버전)</option>
-      <option value="deepseek/deepseek-r1">DeepSeek R1</option>
-      <option value="qwen/qwen3.5-plus-20260420">Qwen 3.5 Plus (중국어 이해력 강점, 검열 완화)</option>
-      <option value="z-ai/glm-5.3-flash">GLM 5.3 Flash (매우 저렴)</option>
-      <option value="x-ai/grok-2-1212">Grok 2</option>
-      <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-      <option value="nousresearch/hermes-3-llama-3.1-405b">Hermes 3 (405B)</option>
-      <option value="sao10k/l3.1-euryale-70b">Euryale 70B</option>
-      <option value="neversleep/llama-3.1-lumimaid-70b">Lumimaid 70B</option>
-    </select>
-  </div>
-
-  <div class="slot" data-slot="2">
-    <div class="slot-title">② 두 번째 소설</div>
-    <label>중국어 원문 붙여넣기</label>
-    <textarea id="text-input-2" placeholder="여기에 붙여넣기... (없으면 비워두세요)"></textarea>
-    <label class="upload-btn" for="file-input-2">또는 .txt 파일 선택</label>
-    <input type="file" id="file-input-2" accept=".txt" hidden>
-    <label>모델</label>
-    <select id="model-2">
-      <option value="deepseek/deepseek-v4-flash" selected>DeepSeek V4 Flash (가장 저렴, 기본값)</option>
-      <option value="deepseek/deepseek-v4.1-flash">DeepSeek V4.1 Flash (최신, 조금 더 비쌈)</option>
-      <option value="deepseek/deepseek-chat">DeepSeek V3 (deepseek-chat, 예전 버전)</option>
-      <option value="deepseek/deepseek-r1">DeepSeek R1</option>
-      <option value="qwen/qwen3.5-plus-20260420">Qwen 3.5 Plus (중국어 이해력 강점, 검열 완화)</option>
-      <option value="z-ai/glm-5.3-flash">GLM 5.3 Flash (매우 저렴)</option>
-      <option value="x-ai/grok-2-1212">Grok 2</option>
-      <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-      <option value="nousresearch/hermes-3-llama-3.1-405b">Hermes 3 (405B)</option>
-      <option value="sao10k/l3.1-euryale-70b">Euryale 70B</option>
-      <option value="neversleep/llama-3.1-lumimaid-70b">Lumimaid 70B</option>
-    </select>
-  </div>
-
-  <div class="slot" data-slot="3">
-    <div class="slot-title">③ 세 번째 소설</div>
-    <label>중국어 원문 붙여넣기</label>
-    <textarea id="text-input-3" placeholder="여기에 붙여넣기... (없으면 비워두세요)"></textarea>
-    <label class="upload-btn" for="file-input-3">또는 .txt 파일 선택</label>
-    <input type="file" id="file-input-3" accept=".txt" hidden>
-    <label>모델</label>
-    <select id="model-3">
-      <option value="deepseek/deepseek-v4-flash" selected>DeepSeek V4 Flash (가장 저렴, 기본값)</option>
-      <option value="deepseek/deepseek-v4.1-flash">DeepSeek V4.1 Flash (최신, 조금 더 비쌈)</option>
-      <option value="deepseek/deepseek-chat">DeepSeek V3 (deepseek-chat, 예전 버전)</option>
-      <option value="deepseek/deepseek-r1">DeepSeek R1</option>
-      <option value="qwen/qwen3.5-plus-20260420">Qwen 3.5 Plus (중국어 이해력 강점, 검열 완화)</option>
-      <option value="z-ai/glm-5.3-flash">GLM 5.3 Flash (매우 저렴)</option>
-      <option value="x-ai/grok-2-1212">Grok 2</option>
-      <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-      <option value="nousresearch/hermes-3-llama-3.1-405b">Hermes 3 (405B)</option>
-      <option value="sao10k/l3.1-euryale-70b">Euryale 70B</option>
-      <option value="neversleep/llama-3.1-lumimaid-70b">Lumimaid 70B</option>
-    </select>
-  </div>
+  <div id="slots"></div>
 
   <button id="btn-send">🚀 전체 번역 요청 보내기</button>
   <div class="msg" id="send-msg"></div>
@@ -144,6 +93,99 @@
 <script>
 const $ = id => document.getElementById(id);
 const SLOTS = [1,2,3];
+
+const MODELS = [
+  ['deepseek/deepseek-v4-flash','DeepSeek V4 Flash (가장 저렴, 기본값)'],
+  ['deepseek/deepseek-v4.1-flash','DeepSeek V4.1 Flash (최신, 조금 더 비쌈)'],
+  ['deepseek/deepseek-chat','DeepSeek V3 (deepseek-chat, 예전 버전)'],
+  ['deepseek/deepseek-r1','DeepSeek R1'],
+  ['qwen/qwen3.5-plus-20260420','Qwen 3.5 Plus (중국어 이해력 강점, 검열 완화)'],
+  ['z-ai/glm-5.3-flash','GLM 5.3 Flash (매우 저렴)'],
+  ['x-ai/grok-2-1212','Grok 2'],
+  ['google/gemini-2.0-flash-001','Gemini 2.0 Flash'],
+  ['nousresearch/hermes-3-llama-3.1-405b','Hermes 3 (405B)'],
+  ['sao10k/l3.1-euryale-70b','Euryale 70B'],
+  ['neversleep/llama-3.1-lumimaid-70b','Lumimaid 70B']
+];
+
+// 튜닝 항목 정의 (기본값은 translate.js 의 기존 동작과 동일)
+const FIELDS = [
+  {key:'chunkSize', label:'청크 크기 (글자 수)', type:'number', ph:'1500', hint:'크게 하면 API 호출 횟수(반복되는 프롬프트 비용)가 줄지만 문맥 오류·누락 위험이 커져요. 권장 1000~3000'},
+  {key:'temperature', label:'온도 (Temperature)', type:'number', step:'0.1', ph:'0.1', hint:'낮을수록 원문에 충실, 높을수록 자유로운 표현. 번역은 0~0.5 권장'},
+  {key:'maxTokens', label:'최대 출력 토큰', type:'number', ph:'자동 (청크 크기에 맞춤)', hint:'청크를 크게 키우면 자동으로 늘어나요. 번역이 중간에 잘리면 올리세요'},
+  {key:'concurrency', label:'동시 요청 수', type:'number', ph:'1', hint:'1~8. 올리면 빨라지지만 429(요청 한도) 오류가 늘 수 있고, 새 이름 표기집 반영이 한 묶음씩 늦어져요'},
+  {key:'retries', label:'청크당 재시도 횟수', type:'number', ph:'5', hint:'실패 시 다시 시도하는 최대 횟수 (1~10)'},
+  {key:'glossary', label:'고유명사 표기집', type:'select', opts:[['on','사용 (기본)'],['off','끄기']]},
+  {key:'reasoning', label:'Thinking(추론)', type:'select', opts:[['default','모델 기본값'],['off','끄기 (빠르고 저렴)']], hint:'모델이 지원하지 않으면 자동으로 무시하고 진행해요'},
+  {key:'prompt', label:'번역 프롬프트 (직접 수정)', type:'textarea', ph:'비워두면 기본 프롬프트 사용 (저장소 prompt.txt가 있으면 그 파일)', hint:'새 이름을 표기집에 자동 추가하려면 기본 프롬프트의 ###NEW_NAMES### 규칙을 유지해야 해요'}
+];
+
+function fieldHTML(prefix, f, isSlot){
+  const id = prefix + f.key;
+  let ctl = '';
+  if (f.type === 'select') {
+    const first = isSlot ? '<option value="">공통값 사용</option>' : '';
+    ctl = `<select id="${id}">${first}${f.opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
+  } else if (f.type === 'textarea') {
+    ctl = `<textarea class="prompt" id="${id}" placeholder="${isSlot ? '공통값 사용' : f.ph}"></textarea>`;
+  } else {
+    ctl = `<input type="number" inputmode="decimal" id="${id}" ${f.step?`step="${f.step}"`:''} placeholder="${isSlot ? '공통값 사용' : f.ph}">`;
+  }
+  return `<label>${f.label}</label>${ctl}${(!isSlot && f.hint) ? `<div class="hint">${f.hint}</div>` : ''}`;
+}
+
+// 공통 설정 UI + 저장
+$('common-cfg').innerHTML = FIELDS.map(f => fieldHTML('cfg-', f, false)).join('');
+FIELDS.forEach(f => {
+  const el = $('cfg-'+f.key);
+  const saved = localStorage.getItem('tq_cfg_'+f.key);
+  if (saved !== null) el.value = saved;
+  ['input','change'].forEach(ev => el.addEventListener(ev, () => localStorage.setItem('tq_cfg_'+f.key, el.value)));
+});
+
+// 슬롯 UI
+const SLOT_NAMES = ['① 첫 번째 소설','② 두 번째 소설','③ 세 번째 소설'];
+$('slots').innerHTML = SLOTS.map((idx, n) => `
+  <div class="slot" data-slot="${idx}">
+    <div class="slot-title">${SLOT_NAMES[n]}</div>
+    <label>중국어 원문 붙여넣기</label>
+    <textarea id="text-input-${idx}" placeholder="여기에 붙여넣기...${idx>1?' (없으면 비워두세요)':''}"></textarea>
+    <label class="upload-btn" for="file-input-${idx}">또는 .txt 파일 선택</label>
+    <input type="file" id="file-input-${idx}" accept=".txt" hidden>
+    <label>모델</label>
+    <select id="model-${idx}">${MODELS.map((m,i)=>`<option value="${m[0]}"${i===0?' selected':''}>${m[1]}</option>`).join('')}</select>
+    <details>
+      <summary>이 소설만 다르게 설정 (선택)</summary>
+      ${FIELDS.map(f => fieldHTML('s'+idx+'-', f, true)).join('')}
+    </details>
+  </div>`).join('');
+
+// 슬롯 값이 있으면 그것을, 없으면 공통값을 사용해 설정 객체 생성 (비어 있는 항목은 아예 넣지 않음 → translate.js 기본값)
+function buildConfig(idx){
+  const cfg = {};
+  FIELDS.forEach(f => {
+    let v = ($('s'+idx+'-'+f.key).value || '').trim();
+    if (v === '') v = ($('cfg-'+f.key).value || '').trim();
+    if (v === '') return;
+    if (f.type === 'number') {
+      const n = Number(v);
+      if (isFinite(n)) cfg[f.key] = n;
+    } else {
+      cfg[f.key] = v;
+    }
+  });
+  return cfg;
+}
+function cfgSummary(cfg){
+  const parts = [];
+  if (cfg.chunkSize) parts.push('청크 '+cfg.chunkSize);
+  if (cfg.temperature !== undefined) parts.push('온도 '+cfg.temperature);
+  if (cfg.concurrency) parts.push('동시 '+cfg.concurrency);
+  if (cfg.reasoning === 'off') parts.push('추론 끔');
+  if (cfg.glossary === 'off') parts.push('표기집 끔');
+  if (cfg.prompt) parts.push('커스텀 프롬프트');
+  return parts.join(' · ');
+}
 
 // ── 설정값 로컬 저장 ──
 ['pat','owner','repo','branch'].forEach(id=>{
@@ -188,6 +230,24 @@ function saveJobs(jobs){
   localStorage.setItem('tq_jobs', JSON.stringify(jobs));
 }
 
+// GitHub 연속 커밋 시 간헐적으로 나는 409(충돌)를 짧게 기다렸다 재시도
+async function putFile(owner, repo, path, content, message, branch){
+  let lastErr = '';
+  for (let t = 0; t < 4; t++) {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: ghHeaders(),
+      body: JSON.stringify({ message, content: utf8ToB64(content), branch })
+    });
+    if (res.ok) return;
+    const e = await res.json().catch(()=>({}));
+    lastErr = e.message || res.status;
+    if (res.status !== 409 && res.status !== 422 && res.status < 500) break;
+    await sleep(1500 * (t + 1));
+  }
+  throw new Error(lastErr);
+}
+
 // idx번 슬롯 하나를 업로드+실행. 텍스트 없으면 null 반환(건너뜀). 실패 시 throw.
 async function uploadSlot(idx){
   const text = $('text-input-'+idx).value.trim();
@@ -201,18 +261,20 @@ async function uploadSlot(idx){
   const baseName = 'input-' + Date.now() + '-s' + idx;
   const path = `queue/${baseName}.txt`;
 
-  const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-    method: 'PUT',
-    headers: ghHeaders(),
-    body: JSON.stringify({
-      message: `번역 요청: ${baseName}`,
-      content: utf8ToB64(text),
-      branch
-    })
-  });
-  if (!putRes.ok) {
-    const e = await putRes.json().catch(()=>({}));
-    throw new Error(`[슬롯${idx}] 업로드 실패: ${e.message || putRes.status}`);
+  try {
+    await putFile(owner, repo, path, text, `번역 요청: ${baseName}`, branch);
+  } catch (err) {
+    throw new Error(`[슬롯${idx}] 업로드 실패: ${err.message}`);
+  }
+
+  // 번역 설정 파일 (원문과 같은 이름 + .config.json) - translate.js 가 읽어서 적용
+  const cfg = buildConfig(idx);
+  if (Object.keys(cfg).length) {
+    try {
+      await putFile(owner, repo, `queue/${baseName}.config.json`, JSON.stringify(cfg, null, 2), `번역 설정: ${baseName}`, branch);
+    } catch (err) {
+      throw new Error(`[슬롯${idx}] 설정 파일 업로드 실패: ${err.message}`);
+    }
   }
 
   const dispatchRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/translate.yml/dispatches`, {
@@ -228,7 +290,7 @@ async function uploadSlot(idx){
     throw new Error(`[슬롯${idx}] 실행 트리거 실패: ${e.message || dispatchRes.status}`);
   }
 
-  return { baseName, model, idx };
+  return { baseName, model, idx, cfg: cfgSummary(cfg) };
 }
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
@@ -256,7 +318,7 @@ $('btn-send').addEventListener('click', async () => {
     try {
       const r = await uploadSlot(idx);
       if (r) {
-        jobs.unshift({ baseName: r.baseName, sentAt: new Date().toLocaleString('ko-KR'), model: r.model, done:false });
+        jobs.unshift({ baseName: r.baseName, sentAt: new Date().toLocaleString('ko-KR'), model: r.model, cfg: r.cfg, done:false });
         $('text-input-'+idx).value = '';
         results.push({ idx, ok:true });
       }
@@ -322,7 +384,7 @@ function renderJobs(){
   wrap.innerHTML = jobs.map((j,i) => `
     <div class="job">
       <div class="name">${j.baseName}</div>
-      <div class="meta">${j.sentAt} · ${j.model}</div>
+      <div class="meta">${j.sentAt} · ${j.model}${j.cfg ? '<br>' + j.cfg : ''}</div>
       <div class="msg" id="status-${i}">확인 필요</div>
       <button class="ghost" onclick="checkJob('${j.baseName}', document.getElementById('status-${i}'))">🔄 상태 새로고침</button>
     </div>
