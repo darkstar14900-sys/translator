@@ -41,6 +41,7 @@ const DEFAULT_PROMPT = `당신은 중국 소설 전문 번역가입니다. 아�
 const INPUT_FILE = process.env.INPUT_FILE;
 const MODEL = process.env.MODEL || 'deepseek/deepseek-v4-flash';
 const API_KEY = process.env.OPENROUTER_API_KEY;
+const API_URL = process.env.API_URL || 'https://openrouter.ai/api/v1/chat/completions'; // (테스트용 override)
 const GH_TOKEN = process.env.GITHUB_TOKEN;
 const GH_REPO = process.env.GITHUB_REPOSITORY; // "owner/repo" 형태, Actions가 자동으로 제공
 const GH_REF = process.env.GITHUB_REF_NAME || 'main';
@@ -52,9 +53,37 @@ if (!INPUT_FILE) { console.error('INPUT_FILE 환경변수가 없습니다.'); pr
 if (!API_KEY) { console.error('OPENROUTER_API_KEY 시크릿이 설정되지 않았습니다.'); process.exit(1); }
 if (!fs.existsSync(INPUT_FILE)) { console.error(`입력 파일을 찾을 수 없습니다: ${INPUT_FILE}`); process.exit(1); }
 
-// 저장소 루트에 prompt.txt 파일이 있으면 그것을 커스텀 프롬프트로 사용, 없으면 기본값
+// ── queue.html 이 원문 옆에 함께 올리는 설정 파일 (queue/input-xxx.config.json) ──
+// 없거나 비어 있는 항목은 기존 기본값을 그대로 사용합니다.
+const configPath = INPUT_FILE.replace(/\.[^.]+$/, '') + '.config.json';
+let CFG = {};
+if (fs.existsSync(configPath)) {
+  try { CFG = JSON.parse(fs.readFileSync(configPath, 'utf-8')) || {}; }
+  catch (e) { console.error('설정 파일 파싱 실패, 기본값으로 진행합니다:', e.message); }
+}
+function numCfg(v, def, min, max) {
+  if (v === undefined || v === null || v === '') return def;
+  const n = Number(v);
+  if (!isFinite(n)) return def;
+  return Math.min(max, Math.max(min, n));
+}
+const CHUNK_SIZE = Math.round(numCfg(CFG.chunkSize, 1500, 200, 20000));
+const TEMPERATURE = numCfg(CFG.temperature, 0.1, 0, 2);
+const MAX_TOKENS = Math.round(numCfg(CFG.maxTokens, Math.min(32000, Math.max(8000, CHUNK_SIZE * 3)), 500, 64000));
+const CONCURRENCY = Math.round(numCfg(CFG.concurrency, 1, 1, 8));
+const MAX_RETRIES = Math.round(numCfg(CFG.retries, 5, 1, 10));
+const USE_GLOSSARY = !(CFG.glossary === 'off' || CFG.glossary === false);
+const REASONING_OFF = CFG.reasoning === 'off';
+let reasoningUnsupported = false; // 모델이 reasoning 옵션을 거부하면 자동으로 빼고 재시도
+
+// 프롬프트 우선순위: 설정 파일의 prompt > 저장소 루트 prompt.txt > 기본값
 const promptPath = path.join(process.cwd(), 'prompt.txt');
-const SYSTEM_PROMPT = fs.existsSync(promptPath) ? fs.readFileSync(promptPath, 'utf-8') : DEFAULT_PROMPT;
+let SYSTEM_PROMPT = DEFAULT_PROMPT;
+if (typeof CFG.prompt === 'string' && CFG.prompt.trim()) SYSTEM_PROMPT = CFG.prompt;
+else if (fs.existsSync(promptPath)) SYSTEM_PROMPT = fs.readFileSync(promptPath, 'utf-8');
+if (!USE_GLOSSARY) {
+  SYSTEM_PROMPT += '\n\n(참고: 이번 작업은 고유명사 표기집 기능이 꺼져 있습니다. ###NEW_NAMES### 부분은 절대 쓰지 마세요.)';
+}
 
 const baseName = path.basename(INPUT_FILE).replace(/\.[^.]+$/, '');
 const outDir = path.join(process.cwd(), 'output');
@@ -66,7 +95,7 @@ const partialPath = path.join(outDir, `${baseName}_진행중.txt`);
 const glossaryPath = path.join(outDir, `${baseName}.glossary.txt`);
 
 // translator-1-1.html 의 chunkText()와 동일한 로직 (청크를 키워서 API 호출 횟수 = 반복되는 프롬프트 비용을 줄임)
-function chunkText(text, max = 1500) {
+function chunkText(text, max = CHUNK_SIZE) {
   const paras = text.split('\n');
   const out = [];
   let cur = '';
@@ -89,7 +118,7 @@ async function callAPI(text, glossary) {
   const systemWithGlossary = glossary
     ? `${SYSTEM_PROMPT}\n\n## 고유명사 표기 (아래 표기를 이번 소설 전체에서 절대 다르게 바꾸지 말고 반드시 그대로 사용하세요)\n${glossary}`
     : SYSTEM_PROMPT;
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -99,8 +128,9 @@ async function callAPI(text, glossary) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 8000,
-      temperature: 0.1,
+      max_tokens: MAX_TOKENS,
+      temperature: TEMPERATURE,
+      ...reasoningParam(),
       messages: [
         { role: 'system', content: systemWithGlossary },
         { role: 'user', content: `다음 중국어 원문을 100% 한국어로 완벽하게 번역해주세요. 한자(중국어)를 그대로 출력하는 것은 엄격히 금지됩니다.\n\n[원문]\n${text}` }
@@ -109,10 +139,23 @@ async function callAPI(text, glossary) {
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
-    throw new Error(e.error?.message || `API 오류 ${res.status}`);
+    const msg = e.error?.message || `API 오류 ${res.status}`;
+    if (REASONING_OFF && !reasoningUnsupported && /reasoning/i.test(msg)) {
+      reasoningUnsupported = true;
+      console.log('이 모델은 reasoning 끄기 옵션을 지원하지 않아 옵션 없이 재시도합니다.');
+    }
+    throw new Error(msg);
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || '';
+  const choice = data.choices?.[0];
+  if (choice?.finish_reason === 'length') {
+    throw new Error('출력이 최대 토큰에서 잘렸습니다 (청크 크기를 줄이거나 최대 출력 토큰을 늘리세요)');
+  }
+  return choice?.message?.content || '';
+}
+
+function reasoningParam() {
+  return REASONING_OFF && !reasoningUnsupported ? { reasoning: { enabled: false } } : {};
 }
 
 // 소설 앞부분을 미리 보여주고, 인물/지명 등 고유명사의 한국어 표기를 한 번만 정해서
@@ -125,7 +168,7 @@ async function buildGlossary(fullText) {
         console.log(`고유명사 표기집 생성 재시도 ${retry}/3...`);
         await sleep(retry * 3000);
       }
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const res = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,6 +180,7 @@ async function buildGlossary(fullText) {
           model: MODEL,
           max_tokens: 1500,
           temperature: 0,
+          ...reasoningParam(),
           messages: [
             { role: 'system', content: '당신은 중국 소설의 고유명사(인물 이름, 지명, 문파/조직명 등)를 한국어로 어떻게 표기할지 정하는 역할입니다.' },
             { role: 'user', content: `다음은 어느 중국 소설의 앞부분입니다. 여기 등장하는 인물 이름, 지명, 조직/문파명 등 고유명사를 모두 찾아서, 앞으로 소설 전체에서 일관되게 쓸 한국어 표기를 정해주세요.\n\n형식: 원문한자 = 한국어표기\n한 줄에 하나씩만 출력하고, 다른 설명·번호·제목은 절대 붙이지 마세요.\n\n[본문 일부]\n${sample}` }
@@ -221,6 +265,68 @@ function commitProgress(message) {
   }
 }
 
+// 새 고유명사 블록을 표기집에 반영 (이미 있는 이름은 제외). 갱신된 표기집을 반환
+function mergeNewNames(glossary, block, label) {
+  const existingKeys = extractGlossaryKeys(glossary);
+  const newLines = block.split('\n')
+    .map(l => l.trim())
+    .filter(l => {
+      const idx = l.indexOf('=');
+      if (idx === -1) return false;
+      const key = l.slice(0, idx).trim();
+      return key && !existingKeys.has(key);
+    });
+  if (!newLines.length) return glossary;
+  const addition = newLines.join('\n');
+  fs.appendFileSync(glossaryPath, (fs.existsSync(glossaryPath) && fs.statSync(glossaryPath).size > 0 ? '\n' : '') + addition);
+  console.log(`${label}: 새 고유명사 표기 추가 ->\n${addition}`);
+  return glossary ? glossary + '\n' + addition : addition;
+}
+
+// 청크 하나를 번역 (재시도 포함). 표기집 파일/상태는 건드리지 않고 결과만 반환 → 동시 실행해도 안전
+async function translateChunk(i, total, chunk, glossary) {
+  let translated = null;
+  let namesBlock = '';
+  for (let retry = 0; retry < MAX_RETRIES; retry++) {
+    try {
+      if (retry > 0) {
+        const wait = retry * 4000;
+        console.log(`청크 ${i + 1}/${total} 재시도 ${retry}/${MAX_RETRIES} (${wait / 1000}초 대기)`);
+        await sleep(wait);
+      }
+      const rawResponse = await callAPI(chunk, glossary);
+
+      // 응답에서 ###NEW_NAMES### 부분을 분리 - 실제 번역문과 새 고유명사 표기를 나눔
+      // (형식이 "원문 = 표기"처럼 보이지 않으면 AI가 마커를 잘못 쓴 것으로 간주하고 본문 손실 방지 위해 무시)
+      const markerIdx = rawResponse.indexOf('###NEW_NAMES###');
+      let mainText = rawResponse;
+      let pendingNamesBlock = '';
+      if (markerIdx !== -1) {
+        // 마커가 있으면 일단 무조건 여기서 잘라서, 마커 글자 자체가 번역 결과물에 노출되는 일은 없게 함
+        mainText = rawResponse.slice(0, markerIdx).trim();
+        const candidate = rawResponse.slice(markerIdx + '###NEW_NAMES###'.length).trim();
+        // 뒤에 온 내용이 실제 "원문 = 표기" 형식일 때만 표기집 후보로 인정 (형식이 이상하면 그냥 버림)
+        if (candidate && candidate.includes('=')) {
+          pendingNamesBlock = candidate;
+        }
+      }
+
+      const cjk = mainText.match(/[\u4e00-\u9fa5]/g);
+      if (cjk && cjk.length > 15) throw new Error('중국어 원문 출력 감지됨 (검열 회피 오류)');
+
+      // 여기 도달했다는 건 이번 청크 번역이 최종 확정 성공했다는 뜻
+      // (재시도로 버려질 응답에서 나온 이름이 표기집에 들어가는 것을 방지하기 위해, 반영은 호출한 쪽에서 함)
+      translated = mainText;
+      namesBlock = pendingNamesBlock;
+      break;
+    } catch (e) {
+      if (retry === MAX_RETRIES - 1) translated = `[청크 ${i + 1} 번역 실패: ${e.message}]`;
+      else translated = null;
+    }
+  }
+  return { translated, namesBlock };
+}
+
 async function main() {
   execSync('git config user.name "translate-bot"');
   execSync('git config user.email "actions@github.com"');
@@ -229,10 +335,13 @@ async function main() {
   const chunks = chunkText(raw);
   const total = chunks.length;
   console.log(`총 ${total}개 청크로 분할됨. 모델: ${MODEL}`);
+  console.log(`설정: 청크 ${CHUNK_SIZE}자 / 온도 ${TEMPERATURE} / 최대출력 ${MAX_TOKENS}토큰 / 동시 ${CONCURRENCY}개 / 재시도 ${MAX_RETRIES}회 / 표기집 ${USE_GLOSSARY ? '사용' : '끔'} / reasoning ${REASONING_OFF ? '끔' : '모델 기본'}${typeof CFG.prompt === 'string' && CFG.prompt.trim() ? ' / 커스텀 프롬프트' : ''}`);
 
   // 고유명사(인물/지명) 표기집 준비 - 이미 있으면 재사용, 없으면 이번에 한 번만 생성
   let glossary = '';
-  if (fs.existsSync(glossaryPath)) {
+  if (!USE_GLOSSARY) {
+    console.log('고유명사 표기집 기능이 꺼져 있습니다.');
+  } else if (fs.existsSync(glossaryPath)) {
     glossary = fs.readFileSync(glossaryPath, 'utf-8');
     console.log('기존 고유명사 표기집을 불러왔습니다.');
   } else {
@@ -262,77 +371,40 @@ async function main() {
   }
 
   let timeUp = false;
+  let lastCommitCursor = cursor;
 
-  for (let i = cursor; i < total; i++) {
+  // CONCURRENCY개씩 묶어서 동시에 번역. 묶음이 끝나면 순서대로 결과/새 이름을 반영하고 저장
+  for (let start = cursor; start < total; start += CONCURRENCY) {
     if (Date.now() - START_TIME > MAX_RUNTIME_MS) {
       timeUp = true;
       console.log(`시간 제한(5시간40분) 도달. 지금까지 ${cursor}/${total} 완료. 안전하게 저장하고 다음 회차를 예약합니다.`);
       break;
     }
-    let translated = null;
-    for (let retry = 0; retry < 5; retry++) {
-      try {
-        if (retry > 0) {
-          const wait = retry * 4000;
-          console.log(`청크 ${i + 1}/${total} 재시도 ${retry}/5 (${wait / 1000}초 대기)`);
-          await sleep(wait);
-        }
-        const rawResponse = await callAPI(chunks[i], glossary);
+    const idxs = [];
+    for (let k = start; k < Math.min(total, start + CONCURRENCY); k++) idxs.push(k);
 
-        // 응답에서 ###NEW_NAMES### 부분을 분리 - 실제 번역문과 새 고유명사 표기를 나눔
-        // (형식이 "원문 = 표기"처럼 보이지 않으면 AI가 마커를 잘못 쓴 것으로 간주하고 본문 손실 방지 위해 무시)
-        const markerIdx = rawResponse.indexOf('###NEW_NAMES###');
-        let mainText = rawResponse;
-        let pendingNamesBlock = '';
-        if (markerIdx !== -1) {
-          // 마커가 있으면 일단 무조건 여기서 잘라서, 마커 글자 자체가 번역 결과물에 노출되는 일은 없게 함
-          mainText = rawResponse.slice(0, markerIdx).trim();
-          const candidate = rawResponse.slice(markerIdx + '###NEW_NAMES###'.length).trim();
-          // 뒤에 온 내용이 실제 "원문 = 표기" 형식일 때만 표기집 후보로 인정 (형식이 이상하면 그냥 버림)
-          if (candidate && candidate.includes('=')) {
-            pendingNamesBlock = candidate;
-          }
-        }
+    const glossarySnapshot = glossary;
+    const outs = await Promise.all(idxs.map(async (i, n) => {
+      if (n > 0) await sleep(n * 300); // 동시에 몰리지 않도록 살짝 간격
+      return translateChunk(i, total, chunks[i], glossarySnapshot);
+    }));
 
-        const cjk = mainText.match(/[\u4e00-\u9fa5]/g);
-        if (cjk && cjk.length > 15) throw new Error('중국어 원문 출력 감지됨 (검열 회피 오류)');
-
-        // 여기 도달했다는 건 이번 청크 번역이 최종 확정 성공했다는 뜻 -> 이제서야 표기집에 반영
-        // (재시도로 버려질 응답에서 나온 이름이 먼저 저장되는 것을 방지, + 이미 있는 이름은 중복 제외)
-        if (pendingNamesBlock) {
-          const existingKeys = extractGlossaryKeys(glossary);
-          const newLines = pendingNamesBlock.split('\n')
-            .map(l => l.trim())
-            .filter(l => {
-              const idx = l.indexOf('=');
-              if (idx === -1) return false;
-              const key = l.slice(0, idx).trim();
-              return key && !existingKeys.has(key);
-            });
-          if (newLines.length) {
-            const addition = newLines.join('\n');
-            glossary = glossary ? glossary + '\n' + addition : addition;
-            fs.appendFileSync(glossaryPath, (fs.existsSync(glossaryPath) && fs.statSync(glossaryPath).size > 0 ? '\n' : '') + addition);
-            console.log(`청크 ${i + 1}: 새 고유명사 표기 추가 ->\n${addition}`);
-          }
-        }
-
-        translated = mainText;
-        break;
-      } catch (e) {
-        if (retry === 4) translated = `[청크 ${i + 1} 번역 실패: ${e.message}]`;
-        else translated = null;
+    for (let n = 0; n < idxs.length; n++) {
+      const i = idxs[n];
+      results[i] = outs[n].translated;
+      if (USE_GLOSSARY && outs[n].namesBlock) {
+        glossary = mergeNewNames(glossary, outs[n].namesBlock, `청크 ${i + 1}`);
       }
     }
-    results[i] = translated;
-    cursor = i + 1;
+    cursor = idxs[idxs.length - 1] + 1;
     console.log(`[${cursor}/${total}] 완료`);
 
     fs.writeFileSync(progressPath, JSON.stringify({ cursor, total, results }));
     fs.writeFileSync(partialPath, results.filter(Boolean).join('\n\n'));
 
-    if (cursor % COMMIT_EVERY === 0) {
+    if (cursor - lastCommitCursor >= COMMIT_EVERY) {
       commitProgress(`중간 저장 ${cursor}/${total}: ${baseName}`);
+      lastCommitCursor = cursor;
     }
   }
 
